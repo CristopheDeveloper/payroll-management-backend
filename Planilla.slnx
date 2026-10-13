@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/database/">
+    <File Path="database/01_Rol.sql" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Planilla.Api/Planilla.Api.csproj" />
+    <Project Path="src/Planilla.Aplicacion/Planilla.Aplicacion.csproj" />
+    <Project Path="src/Planilla.Dominio/Planilla.Dominio.csproj" />
+    <Project Path="src/Planilla.Infraestructura/Planilla.Infraestructura.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Planilla.Dominio.Tests/Planilla.Dominio.Tests.csproj" />
+  </Folder>
+</Solution>
