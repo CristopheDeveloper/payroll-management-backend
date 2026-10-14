@@ -12,12 +12,19 @@ public partial class PlanillaDbContext : DbContext
     {
     }
 
+    public virtual DbSet<Bitacora> Bitacora { get; set; }
+
     public virtual DbSet<Rol> Rol { get; set; }
 
     public virtual DbSet<Usuario> Usuario { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<Bitacora>(entity =>
+        {
+            entity.Property(e => e.Fecha).HasDefaultValueSql("(sysdatetime())", "DF_Bitacora_Fecha");
+        });
+
         modelBuilder.Entity<Rol>(entity =>
         {
             entity.Property(e => e.Activo).HasDefaultValue(true, "DF_Rol_Activo");

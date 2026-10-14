@@ -40,6 +40,16 @@ Todas las tablas (excepto Bitacora) tienen `UsuarioIng`, `FechaIng`, `UsuarioAct
 
 Para que una entidad se audite tiene que implementar `IAuditable`. Como las entidades las genera el scaffold, eso se hace en `src/Planilla.Dominio/Auditoria/EntidadesAuditables.cs`: cada tabla nueva se agrega ahí con una línea, por ejemplo `public partial class Empleado : IAuditable { }`.
 
+### Bitácora
+
+`GuardarCambiosAsync()` también registra en la tabla `Bitacora` cada INSERT, UPDATE y DELETE de cualquier tabla, con los valores en JSON, el usuario y la fecha. No hay que hacer nada en los servicios, y todas las tablas se registran automáticamente (no hace falta agregarlas a ninguna lista).
+
+- INSERT guarda todos los valores; DELETE, todos los valores anteriores; UPDATE, solo los campos que cambiaron.
+- Los campos de auditoría no cuentan como cambios. `PasswordHash` sí se registra (ya hasheado), para que quede quién y cuándo cambió o restableció una contraseña.
+- El cambio y su registro en la bitácora se guardan en la misma transacción.
+- Para que el UPDATE tenga los valores anteriores, la entidad tiene que haberse leído con seguimiento (la regla del `AsNoTracking()` de arriba). Nunca uses `Update()` con un objeto que viene del frontend.
+- Las llaves foráneas se crean sin `ON DELETE CASCADE`: un borrado en cascada de la base no pasa por EF Core y no quedaría en la bitácora. Si hay que borrar hijos, el servicio los carga y los elimina con EF Core.
+
 ## Lo que necesitas instalar
 
 - SDK de .NET 10

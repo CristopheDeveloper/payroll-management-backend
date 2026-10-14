@@ -2,6 +2,7 @@
   <Folder Name="/database/">
     <File Path="database/01_Rol.sql" />
     <File Path="database/02_Usuario.sql" />
+    <File Path="database/03_Bitacora.sql" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Planilla.Api/Planilla.Api.csproj" />

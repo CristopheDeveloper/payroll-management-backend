@@ -21,6 +21,7 @@ builder.Services.AddDbContext<PlanillaDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddScoped<IUnidadTrabajo, UnidadTrabajo>();
 builder.Services.AddScoped<Auditoria>();
+builder.Services.AddScoped<RegistroBitacora>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IUsuarioActual, UsuarioActual>();
 
