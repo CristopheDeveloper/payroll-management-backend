@@ -19,7 +19,7 @@ public class AutenticacionServicio : IAutenticacionServicio
 
     public async Task<LoginRespuestaDto> Login(LoginDto dto)
     {
-        var usuario = await _usuarioRepositorio.ObtenerPorNombreUsuario(dto.NombreUsuario);
+        var usuario = await _usuarioRepositorio.ObtenerPorNombreUsuario(dto.NombreUsuario.Trim());
 
         // Mismo mensaje en todos los casos, para no revelar qué usuarios existen o están inactivos
         if (usuario == null

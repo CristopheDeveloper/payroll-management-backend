@@ -45,7 +45,7 @@ Para que una entidad se audite tiene que implementar `IAuditable`. Como las enti
 `GuardarCambiosAsync()` también registra en la tabla `Bitacora` cada INSERT, UPDATE y DELETE de cualquier tabla, con los valores en JSON, el usuario y la fecha. No hay que hacer nada en los servicios, y todas las tablas se registran automáticamente (no hace falta agregarlas a ninguna lista).
 
 - INSERT guarda todos los valores; DELETE, todos los valores anteriores; UPDATE, solo los campos que cambiaron.
-- Los campos de auditoría no cuentan como cambios. `PasswordHash` sí se registra (ya hasheado), para que quede quién y cuándo cambió o restableció una contraseña.
+- Los campos de auditoría no cuentan como cambios.
 - El cambio y su registro en la bitácora se guardan en la misma transacción.
 - Para que el UPDATE tenga los valores anteriores, la entidad tiene que haberse leído con seguimiento (la regla del `AsNoTracking()` de arriba). Nunca uses `Update()` con un objeto que viene del frontend.
 - Las llaves foráneas se crean sin `ON DELETE CASCADE`: un borrado en cascada de la base no pasa por EF Core y no quedaría en la bitácora. Si hay que borrar hijos, el servicio los carga y los elimina con EF Core.
@@ -107,22 +107,14 @@ Por consola:
 dotnet run --project src/Planilla.Api --launch-profile https
 ```
 
-Para probar que todo está bien, ejecuta `POST /api/Autenticacion/login` en Swagger con el usuario inicial:
+Para probar que todo está bien, ejecuta `POST /api/Autenticacion/login` en Swagger con el usuario inicial `admin`. Debería devolver un token. Cópialo, presiona **Authorize** en Swagger y pégalo; desde ahí Swagger lo manda en todas las peticiones a endpoints protegidos.
 
-```json
-{ "nombreUsuario": "admin", "contrasena": "Admin.2026" }
-```
-
-Debería devolver un token. Cópialo, presiona **Authorize** en Swagger y pégalo; desde ahí Swagger lo manda en todas las peticiones a endpoints protegidos.
-
-Los roles (`ADMIN` y `RRHH`) solo existen en la base de datos: los crea `01_Rol.sql` y no tienen endpoint. En el código sus nombres están como constantes en `Planilla.Dominio/Constantes/Roles.cs`; usa siempre `[Authorize(Roles = Roles.Admin)]` y nunca el texto suelto.
+Los roles (`ADMIN` y `RRHH`) solo existen en la base de datos: los crea `01_Rol.sql` y no tienen mantenimiento. Solo se consultan con `GET /api/Usuario/roles` para asignarlos a un usuario. En el código sus nombres están como constantes en `Planilla.Dominio/Constantes/Roles.cs`; usa siempre `[Authorize(Roles = Roles.Admin)]` y nunca el texto suelto.
 
 Sobre la seguridad:
 
-- **Cada controller o endpoint protegido lleva su `[Authorize]`.** Un endpoint sin `[Authorize]` queda público, así que revisa que esté puesto en cada controller nuevo. Para limitarlo a un rol usa `[Authorize(Roles = Roles.Admin)]`; para varios, `[Authorize(Roles = $"{Roles.Admin},{Roles.Rrhh}")]`. El login es el único público y lleva `[AllowAnonymous]`.
+- **Todos los endpoints piden token por defecto.** No hace falta poner `[Authorize]` para protegerlos; un endpoint solo queda público si lleva `[AllowAnonymous]`, y el login es el único que lo tiene. Para limitarlo a un rol usa `[Authorize(Roles = Roles.Admin)]`; para varios, `[Authorize(Roles = $"{Roles.Admin},{Roles.Rrhh}")]`.
 - **En cada petición se revisa que el usuario del token siga activo y con el mismo rol.** Si el administrador lo desactiva o le cambia el rol, su token deja de servir de inmediato y tiene que volver a iniciar sesión.
-
-El script `02_Usuario.sql` crea el usuario inicial `admin` con la contraseña `Admin.2026`. En QA y producción hay que cambiarla antes de usar el sistema.
 
 ## Ambientes
 
