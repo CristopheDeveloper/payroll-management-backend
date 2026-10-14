@@ -6,3 +6,7 @@ namespace Planilla.Dominio.Entidades;
 public partial class Rol : IAuditable { }
 
 public partial class Usuario : IAuditable { }
+
+public partial class Departamento : IAuditable { }
+
+public partial class Puesto : IAuditable { }

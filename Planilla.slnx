@@ -3,6 +3,8 @@
     <File Path="database/01_Rol.sql" />
     <File Path="database/02_Usuario.sql" />
     <File Path="database/03_Bitacora.sql" />
+    <File Path="database/04_Departamento.sql" />
+    <File Path="database/05_Puesto.sql" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Planilla.Api/Planilla.Api.csproj" />
