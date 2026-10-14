@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -10,7 +10,7 @@ namespace Planilla.Dominio.Entidades;
 public partial class Rol
 {
     [Key]
-    public int Id { get; set; }
+    public int IdRol { get; set; }
 
     [Required]
     [StringLength(50)]
@@ -20,4 +20,18 @@ public partial class Rol
     public string Descripcion { get; set; }
 
     public bool Activo { get; set; }
+
+    [Required]
+    [StringLength(50)]
+    public string UsuarioIng { get; set; }
+
+    public DateTime FechaIng { get; set; }
+
+    [StringLength(50)]
+    public string UsuarioAct { get; set; }
+
+    public DateTime? FechaAct { get; set; }
+
+    [InverseProperty("IdRolNavigation")]
+    public virtual ICollection<Usuario> Usuario { get; set; } = new List<Usuario>();
 }

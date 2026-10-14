@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using Planilla.Api.Seguridad;
 using Planilla.Aplicacion.Excepciones;
 using Planilla.Aplicacion.Interfaces;
 using Planilla.Aplicacion.Servicios;
@@ -18,12 +19,16 @@ var builder = WebApplication.CreateBuilder(args);
 // Base de datos
 builder.Services.AddDbContext<PlanillaDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddScoped<IUnidadTrabajo, UnidadTrabajo>();
+builder.Services.AddScoped<Auditoria>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IUsuarioActual, UsuarioActual>();
 
 // Repositorios
-builder.Services.AddScoped<IRolRepositorio, RolRepositorio>();
+builder.Services.AddScoped<IUsuarioRepositorio, UsuarioRepositorio>();
 
 // Servicios
-builder.Services.AddScoped<IRolServicio, RolServicio>();
+builder.Services.AddScoped<IAutenticacionServicio, AutenticacionServicio>();
 
 // JWT
 var claveJwt = builder.Configuration["Jwt:Clave"];
@@ -50,6 +55,21 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(claveJwt)),
             NameClaimType = "usuario",
             RoleClaimType = "rol"
+        };
+        options.Events = new JwtBearerEvents
+        {
+            // Además de la firma y la fecha, revisa en la base que el usuario siga activo y con el mismo rol
+            OnTokenValidated = async context =>
+            {
+                var idUsuario = context.Principal?.FindFirst("usuarioId")?.Value;
+                var rol = context.Principal?.FindFirst("rol")?.Value;
+                var autenticacion = context.HttpContext.RequestServices.GetRequiredService<IAutenticacionServicio>();
+
+                if (!int.TryParse(idUsuario, out var id) || !await autenticacion.SesionVigente(id, rol))
+                {
+                    context.Fail("La sesión ya no es válida.");
+                }
+            }
         };
     });
 

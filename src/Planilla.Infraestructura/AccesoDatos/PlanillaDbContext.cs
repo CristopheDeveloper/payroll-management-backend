@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Planilla.Dominio.Entidades;
@@ -14,11 +14,24 @@ public partial class PlanillaDbContext : DbContext
 
     public virtual DbSet<Rol> Rol { get; set; }
 
+    public virtual DbSet<Usuario> Usuario { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Rol>(entity =>
         {
             entity.Property(e => e.Activo).HasDefaultValue(true, "DF_Rol_Activo");
+            entity.Property(e => e.FechaIng).HasDefaultValueSql("(sysdatetime())", "DF_Rol_FechaIng");
+        });
+
+        modelBuilder.Entity<Usuario>(entity =>
+        {
+            entity.Property(e => e.Activo).HasDefaultValue(true, "DF_Usuario_Activo");
+            entity.Property(e => e.FechaIng).HasDefaultValueSql("(sysdatetime())", "DF_Usuario_FechaIng");
+
+            entity.HasOne(d => d.IdRolNavigation).WithMany(p => p.Usuario)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Usuario_Rol");
         });
 
         OnModelCreatingPartial(modelBuilder);
