@@ -1,7 +1,3 @@
--- Registro automático de cada inserción, modificación y eliminación en cualquier tabla.
--- La escribe el backend (RegistroBitacora) al guardar; es de solo inserción: nadie la modifica ni la borra.
--- No tiene campos de auditoría porque ella misma es la auditoría, ni llaves foráneas porque
--- registra cambios de cualquier tabla (se vincula por Tabla + IdRegistro).
 CREATE TABLE Bitacora (
     IdBitacora        BIGINT IDENTITY(1,1) NOT NULL,
     Tabla             NVARCHAR(50)         NOT NULL,
@@ -16,8 +12,6 @@ CREATE TABLE Bitacora (
 );
 GO
 
--- Historial de un registro (por ejemplo, los cambios de salario de un empleado)
 CREATE INDEX IX_Bitacora_Tabla_IdRegistro ON Bitacora (Tabla, IdRegistro);
--- Consulta por rango de fechas
 CREATE INDEX IX_Bitacora_Fecha ON Bitacora (Fecha);
 GO

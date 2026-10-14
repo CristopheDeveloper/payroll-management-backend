@@ -17,6 +17,7 @@ CREATE TABLE Usuario (
 );
 GO
 
+-- Admin.2026
 INSERT INTO Usuario (NombreUsuario, PasswordHash, NombreCompleto, IdRol, UsuarioIng) VALUES
     ('admin', '$2b$11$5iv0VAxcoiWUF5VnQJXBIu5ug6bnJYcrOrWIYxDyPVVu75GHnxmB6', 'Administrador del Sistema', 1, 'SISTEMA');
 GO
