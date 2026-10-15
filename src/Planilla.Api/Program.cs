@@ -1,9 +1,12 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using Planilla.Api.Seguridad;
 using Planilla.Aplicacion.Excepciones;
 using Planilla.Aplicacion.Interfaces;
 using Planilla.Aplicacion.Servicios;
@@ -18,12 +21,22 @@ var builder = WebApplication.CreateBuilder(args);
 // Base de datos
 builder.Services.AddDbContext<PlanillaDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddScoped<IUnidadTrabajo, UnidadTrabajo>();
+builder.Services.AddScoped<Auditoria>();
+builder.Services.AddScoped<RegistroBitacora>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IUsuarioActual, UsuarioActual>();
 
 // Repositorios
-builder.Services.AddScoped<IRolRepositorio, RolRepositorio>();
+builder.Services.AddScoped<IUsuarioRepositorio, UsuarioRepositorio>();
+builder.Services.AddScoped<IDepartamentoRepositorio, DepartamentoRepositorio>();
+builder.Services.AddScoped<IPuestoRepositorio, PuestoRepositorio>();
 
 // Servicios
-builder.Services.AddScoped<IRolServicio, RolServicio>();
+builder.Services.AddScoped<IAutenticacionServicio, AutenticacionServicio>();
+builder.Services.AddScoped<IUsuarioServicio, UsuarioServicio>();
+builder.Services.AddScoped<IDepartamentoServicio, DepartamentoServicio>();
+builder.Services.AddScoped<IPuestoServicio, PuestoServicio>();
 
 // JWT
 var claveJwt = builder.Configuration["Jwt:Clave"];
@@ -51,7 +64,25 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             NameClaimType = "usuario",
             RoleClaimType = "rol"
         };
+        options.Events = new JwtBearerEvents
+        {
+            // Además de la firma y la fecha, revisa en la base que el usuario siga activo y con el mismo rol
+            OnTokenValidated = async context =>
+            {
+                var idUsuario = context.Principal?.FindFirst("usuarioId")?.Value;
+                var rol = context.Principal?.FindFirst("rol")?.Value;
+                var autenticacion = context.HttpContext.RequestServices.GetRequiredService<IAutenticacionServicio>();
+
+                if (!int.TryParse(idUsuario, out var id) || !await autenticacion.SesionVigente(id, rol))
+                {
+                    context.Fail("La sesión ya no es válida.");
+                }
+            }
+        };
     });
+
+builder.Services.AddAuthorization(options =>
+    options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
 
 builder.Services.AddSingleton<IGeneradorToken>(new GeneradorToken(claveJwt, emisorJwt, audienciaJwt, duracionJwt));
 builder.Services.AddSingleton<IHashContrasena, HashContrasena>();
@@ -94,34 +125,48 @@ builder.Services.AddOpenApi(options =>
 var app = builder.Build();
 
 // Manejo global de errores
-app.UseExceptionHandler(appError => appError.Run(async context =>
+app.UseExceptionHandler(new ExceptionHandlerOptions
 {
-    var excepcion = context.Features.Get<IExceptionHandlerFeature>()?.Error;
-
-    if (excepcion is ReglaNegocioException reglaNegocio)
+    SuppressDiagnosticsCallback = contexto => true,
+    ExceptionHandler = async context =>
     {
+        var excepcion = context.Features.Get<IExceptionHandlerFeature>()?.Error;
+
+        if (excepcion is ReglaNegocioException reglaNegocio)
+        {
+            await Results.Problem(
+                title: "Regla de negocio",
+                detail: reglaNegocio.Message,
+                statusCode: reglaNegocio.CodigoHttp
+            ).ExecuteAsync(context);
+            return;
+        }
+
+        if (excepcion is DbUpdateException { InnerException: SqlException { Number: 2601 or 2627 } })
+        {
+            await Results.Problem(
+                title: "Regla de negocio",
+                detail: "Ya existe un registro con ese valor.",
+                statusCode: StatusCodes.Status409Conflict
+            ).ExecuteAsync(context);
+            return;
+        }
+
+        var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+        logger.LogError(excepcion, "Error no controlado en {Metodo} {Ruta}", context.Request.Method, context.Request.Path);
+
         await Results.Problem(
-            title: "Regla de negocio",
-            detail: reglaNegocio.Message,
-            statusCode: reglaNegocio.CodigoHttp
+            title: "Ocurrió un error inesperado.",
+            detail: app.Environment.IsDevelopment() ? excepcion?.Message : null,
+            statusCode: StatusCodes.Status500InternalServerError
         ).ExecuteAsync(context);
-        return;
     }
-
-    var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
-    logger.LogError(excepcion, "Error no controlado en {Metodo} {Ruta}", context.Request.Method, context.Request.Path);
-
-    await Results.Problem(
-        title: "Ocurrió un error inesperado.",
-        detail: app.Environment.IsDevelopment() ? excepcion?.Message : null,
-        statusCode: StatusCodes.Status500InternalServerError
-    ).ExecuteAsync(context);
-}));
+});
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.MapOpenApi().AllowAnonymous();
     app.UseSwaggerUI(options =>
     {
         options.SwaggerEndpoint("/openapi/v1.json", "Planilla API v1");
