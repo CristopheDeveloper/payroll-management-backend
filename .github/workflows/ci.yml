@@ -125,7 +125,7 @@ jobs:
           ssh -o BatchMode=yes \
             -o StrictHostKeyChecking=yes \
             "$VPS_USER@$VPS_HOST" \
-            "sudo -n /usr/local/sbin/payroll-deploy prod backend"
+            "sudo -n /bin/bash /usr/local/sbin/payroll-deploy prod backend"
 
       # 14. Comprobar contenedor
       - name: Verify deployment
