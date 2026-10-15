@@ -11,14 +11,17 @@ public class EmpleadoServicio : IEmpleadoServicio
     private readonly IEmpleadoRepositorio _empleadoRepositorio;
     private readonly IPuestoRepositorio _puestoRepositorio;
     private readonly IDepartamentoRepositorio _departamentoRepositorio;
+    private readonly IAsistenciaRepositorio _asistenciaRepositorio;
     private readonly IUnidadTrabajo _unidadTrabajo;
 
     public EmpleadoServicio(IEmpleadoRepositorio empleadoRepositorio, IPuestoRepositorio puestoRepositorio,
-        IDepartamentoRepositorio departamentoRepositorio, IUnidadTrabajo unidadTrabajo)
+        IDepartamentoRepositorio departamentoRepositorio, IAsistenciaRepositorio asistenciaRepositorio,
+        IUnidadTrabajo unidadTrabajo)
     {
         _empleadoRepositorio = empleadoRepositorio;
         _puestoRepositorio = puestoRepositorio;
         _departamentoRepositorio = departamentoRepositorio;
+        _asistenciaRepositorio = asistenciaRepositorio;
         _unidadTrabajo = unidadTrabajo;
     }
 
@@ -131,6 +134,12 @@ public class EmpleadoServicio : IEmpleadoServicio
             throw new ReglaNegocioException("El motivo es obligatorio cuando el tipo de baja es OTRO.");
         }
 
+        var posteriores = await _asistenciaRepositorio.ObtenerFechas(idEmpleado, fechaBaja.AddDays(1), null);
+        if (posteriores.Count > 0)
+        {
+            throw new ReglaNegocioException($"El empleado tiene {posteriores.Count} asistencias registradas después de la fecha de baja (desde el {posteriores[0]:dd/MM/yyyy}). Elimínelas antes de dar de baja.", 409);
+        }
+
         abierto.FechaBaja = fechaBaja;
         abierto.TipoBaja = dto.TipoBaja;
         abierto.MotivoBaja = motivo;
@@ -207,6 +216,15 @@ public class EmpleadoServicio : IEmpleadoServicio
         if (ultimo.FechaBaja.HasValue && fechaIngreso > ultimo.FechaBaja.Value)
         {
             throw new ReglaNegocioException($"La fecha de ingreso no puede ser posterior a la fecha de baja del periodo ({ultimo.FechaBaja.Value:dd/MM/yyyy}).");
+        }
+
+        if (fechaIngreso > ultimo.FechaIngreso)
+        {
+            var anteriores = await _asistenciaRepositorio.ObtenerFechas(idEmpleado, ultimo.FechaIngreso, fechaIngreso.AddDays(-1));
+            if (anteriores.Count > 0)
+            {
+                throw new ReglaNegocioException($"El empleado tiene {anteriores.Count} asistencias registradas antes de la nueva fecha de ingreso (desde el {anteriores[0]:dd/MM/yyyy}). Elimínelas antes de corregir la fecha.", 409);
+            }
         }
 
         ultimo.FechaIngreso = fechaIngreso;

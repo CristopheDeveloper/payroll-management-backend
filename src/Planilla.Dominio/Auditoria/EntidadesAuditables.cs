@@ -15,3 +15,5 @@ public partial class Parametro : IAuditable { }
 public partial class Empleado : IAuditable { }
 
 public partial class PeriodoLaboral : IAuditable { }
+
+public partial class Asistencia : IAuditable { }

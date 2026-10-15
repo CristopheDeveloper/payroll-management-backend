@@ -88,6 +88,9 @@ public partial class Empleado
 
     public DateTime? FechaAct { get; set; }
 
+    [InverseProperty("IdEmpleadoNavigation")]
+    public virtual ICollection<Asistencia> Asistencia { get; set; } = new List<Asistencia>();
+
     [ForeignKey("IdDepartamento")]
     [InverseProperty("Empleado")]
     public virtual Departamento IdDepartamentoNavigation { get; set; }

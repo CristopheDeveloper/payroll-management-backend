@@ -29,6 +29,7 @@ builder.Services.AddScoped<IDepartamentoRepositorio, DepartamentoRepositorio>();
 builder.Services.AddScoped<IPuestoRepositorio, PuestoRepositorio>();
 builder.Services.AddScoped<IParametroRepositorio, ParametroRepositorio>();
 builder.Services.AddScoped<IEmpleadoRepositorio, EmpleadoRepositorio>();
+builder.Services.AddScoped<IAsistenciaRepositorio, AsistenciaRepositorio>();
 
 builder.Services.AddScoped<IAutenticacionServicio, AutenticacionServicio>();
 builder.Services.AddScoped<IUsuarioServicio, UsuarioServicio>();
@@ -36,6 +37,7 @@ builder.Services.AddScoped<IDepartamentoServicio, DepartamentoServicio>();
 builder.Services.AddScoped<IPuestoServicio, PuestoServicio>();
 builder.Services.AddScoped<IParametroServicio, ParametroServicio>();
 builder.Services.AddScoped<IEmpleadoServicio, EmpleadoServicio>();
+builder.Services.AddScoped<IAsistenciaServicio, AsistenciaServicio>();
 
 var claveJwt = builder.Configuration["Jwt:Clave"];
 if (string.IsNullOrWhiteSpace(claveJwt) || claveJwt.Length < 32)

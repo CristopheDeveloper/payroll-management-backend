@@ -12,6 +12,8 @@ public partial class PlanillaDbContext : DbContext
     {
     }
 
+    public virtual DbSet<Asistencia> Asistencia { get; set; }
+
     public virtual DbSet<Bitacora> Bitacora { get; set; }
 
     public virtual DbSet<Departamento> Departamento { get; set; }
@@ -30,6 +32,16 @@ public partial class PlanillaDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<Asistencia>(entity =>
+        {
+            entity.Property(e => e.Estado).HasDefaultValue("PRESENTE", "DF_Asistencia_Estado");
+            entity.Property(e => e.FechaIng).HasDefaultValueSql("(sysdatetime())", "DF_Asistencia_FechaIng");
+
+            entity.HasOne(d => d.IdEmpleadoNavigation).WithMany(p => p.Asistencia)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Asistencia_Empleado");
+        });
+
         modelBuilder.Entity<Bitacora>(entity =>
         {
             entity.Property(e => e.Fecha).HasDefaultValueSql("(sysdatetime())", "DF_Bitacora_Fecha");
