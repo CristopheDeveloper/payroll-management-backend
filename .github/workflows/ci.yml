@@ -1,5 +1,5 @@
 
-name: Planilla API - Production
+name: Planilla API - Production CI/CD
 
 on:
   push:
@@ -7,36 +7,126 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: payroll-production
+  cancel-in-progress: false
+
 jobs:
-  build:
-    name: Build and Docker
+  build-and-deploy:
+    name: Build, Test and Deploy
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
 
     steps:
+      # 1. Descargar codigo
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
+      # 2. Configurar .NET 10
       - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
 
-      - name: Restore
+      # 3. Restaurar dependencias
+      - name: Restore dependencies
         run: dotnet restore Planilla.slnx
 
-      - name: Build
-        run: dotnet build Planilla.slnx -c Release --no-restore
+      # 4. Compilar solucion
+      - name: Build solution
+        run: dotnet build Planilla.slnx --configuration Release --no-restore
 
-      - name: Run tests
-        run: dotnet test Planilla.slnx -c Release --no-build
+      # 5. Ejecutar pruebas
+      - name: Run unit tests
+        run: dotnet test Planilla.slnx --configuration Release --no-build
 
+      # 6. Configurar Docker Buildx
       - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
+      # 7. Construir imagen Docker
       - name: Build Docker image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./Dockerfile
           push: false
+          load: true
           tags: planilla-api:prod
+
+      # 8. Exportar imagen Docker
+      - name: Export Docker image
+        run: docker save -o planilla-api.tar planilla-api:prod
+
+      # 9. Configurar SSH
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_KEY }}
+          SSH_HOST_KEY: ${{ secrets.VPS_HOST_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+          printf '%s\n' "$SSH_HOST_KEY" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      # 10. Verificar conexion SSH
+      - name: Test SSH connection
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            "$VPS_USER@$VPS_HOST" "whoami"
+
+      # 11. Preparar directorio de despliegue
+      - name: Prepare deployment directory
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            "$VPS_USER@$VPS_HOST" \
+            "mkdir -p /home/deploy_payroll/releases"
+
+      # 12. Enviar imagen al VPS
+      - name: Upload Docker image
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          scp -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            planilla-api.tar \
+            "$VPS_USER@$VPS_HOST:/home/deploy_payroll/releases/planilla-api.tar"
+
+      # 13. Desplegar en produccion
+      - name: Deploy production backend
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            "$VPS_USER@$VPS_HOST" \
+            "sudo -n /usr/local/sbin/payroll-deploy prod backend"
+
+      # 14. Verificar despliegue
+      - name: Verify deployment
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            "$VPS_USER@$VPS_HOST" \
+            "curl --fail --silent --show-error --retry 5 --retry-delay 3 --max-time 15 http://127.0.0.1:8510/"
