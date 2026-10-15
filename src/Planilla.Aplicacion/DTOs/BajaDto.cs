@@ -13,4 +13,6 @@ public class BajaDto
 
     [StringLength(200, ErrorMessage = "El motivo debe tener como máximo 200 caracteres.")]
     public string MotivoBaja { get; set; }
+
+    public bool EliminarAusenciasProgramadas { get; set; }
 }

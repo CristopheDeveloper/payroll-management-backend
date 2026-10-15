@@ -49,6 +49,21 @@ public class AsistenciaRepositorio : IAsistenciaRepositorio
             .ToListAsync();
     }
 
+    public async Task<List<Asistencia>> ObtenerPorEmpleadoParaModificar(int idEmpleado, DateOnly desde, DateOnly hasta)
+    {
+        return await _context.Asistencia
+            .Where(a => a.IdEmpleado == idEmpleado && a.Fecha >= desde && a.Fecha <= hasta)
+            .ToListAsync();
+    }
+
+    public async Task<List<DateOnly>> ObtenerFechasPorEstado(int idEmpleado, string estado, DateOnly desde, DateOnly hasta)
+    {
+        return await _context.Asistencia
+            .Where(a => a.IdEmpleado == idEmpleado && a.Estado == estado && a.Fecha >= desde && a.Fecha <= hasta)
+            .Select(a => a.Fecha)
+            .ToListAsync();
+    }
+
     public async Task<List<ResumenAsistenciaDto>> ObtenerTotales(DateOnly desde, DateOnly hasta)
     {
         return await _context.Asistencia

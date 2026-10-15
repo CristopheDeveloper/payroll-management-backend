@@ -75,7 +75,7 @@ public class AsistenciaServicio : IAsistenciaServicio
         var fuera = dto.Registros.Where(r => !empleados.ContainsKey(r.IdEmpleado)).Select(r => r.IdEmpleado).ToList();
         if (fuera.Count > 0)
         {
-            throw new ReglaNegocioException($"Estos empleados no estaban trabajando el {fecha:dd/MM/yyyy} (Id): {string.Join(", ", fuera)}.");
+            throw new ReglaNegocioException($"Estos empleados no estaban trabajando el {fecha:dd'/'MM'/'yyyy} (Id): {string.Join(", ", fuera)}.");
         }
 
         foreach (var registro in dto.Registros)
@@ -161,14 +161,102 @@ public class AsistenciaServicio : IAsistenciaServicio
         }
 
         var asistencias = await _asistenciaRepositorio.ObtenerPorEmpleado(idEmpleado, desde, hasta);
-        return asistencias.Select(a => new AsistenciaDto
+        return asistencias.Select(ADto).ToList();
+    }
+
+    public async Task<List<AsistenciaDto>> RegistrarRango(RangoAsistenciaDto dto)
+    {
+        var desde = dto.Desde.Value;
+        var hasta = dto.Hasta.Value;
+        if (hasta < desde)
         {
-            IdAsistencia = a.IdAsistencia,
-            Fecha = a.Fecha,
-            Estado = a.Estado,
-            HorasExtra = a.HorasExtra,
-            Observacion = a.Observacion
-        }).ToList();
+            throw new ReglaNegocioException("La fecha final no puede ser anterior a la fecha inicial.");
+        }
+        if (hasta.DayNumber - desde.DayNumber > 365)
+        {
+            throw new ReglaNegocioException("El rango no puede ser mayor a un año.");
+        }
+        if (hasta > Hoy().AddYears(1))
+        {
+            throw new ReglaNegocioException("No se pueden registrar ausencias con más de un año de anticipación.");
+        }
+
+        var empleado = await _empleadoRepositorio.ObtenerPorId(dto.IdEmpleado)
+            ?? throw new ReglaNegocioException("El empleado no existe.", 404);
+
+        var omitirFinesDeSemana = dto.SoloDiasHabiles && dto.Estado != "SUSPENSION_IGSS";
+        var dias = new List<DateOnly>();
+        for (var dia = desde; dia <= hasta; dia = dia.AddDays(1))
+        {
+            if (omitirFinesDeSemana && dia.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            {
+                continue;
+            }
+            dias.Add(dia);
+        }
+        if (dias.Count == 0)
+        {
+            throw new ReglaNegocioException("El rango no tiene días hábiles.");
+        }
+
+        var fuera = dias
+            .Where(d => !empleado.PeriodoLaboral.Any(p => p.FechaIngreso <= d && (p.FechaBaja == null || p.FechaBaja >= d)))
+            .ToList();
+        if (fuera.Count > 0)
+        {
+            throw new ReglaNegocioException($"El empleado no tiene periodo laboral en {fuera.Count} días del rango (desde el {fuera[0]:dd'/'MM'/'yyyy}).");
+        }
+
+        var observacion = string.IsNullOrWhiteSpace(dto.Observacion) ? null : dto.Observacion.Trim();
+        var existentes = (await _asistenciaRepositorio.ObtenerPorEmpleadoParaModificar(dto.IdEmpleado, desde, hasta))
+            .ToDictionary(a => a.Fecha);
+
+        foreach (var dia in dias)
+        {
+            if (existentes.TryGetValue(dia, out var asistencia))
+            {
+                asistencia.Estado = dto.Estado;
+                asistencia.HorasExtra = 0;
+                asistencia.Observacion = observacion;
+            }
+            else
+            {
+                _asistenciaRepositorio.Agregar(new Asistencia
+                {
+                    IdEmpleado = dto.IdEmpleado,
+                    Fecha = dia,
+                    Estado = dto.Estado,
+                    HorasExtra = 0,
+                    Observacion = observacion
+                });
+            }
+        }
+
+        await _unidadTrabajo.GuardarCambiosAsync();
+
+        var guardadas = await _asistenciaRepositorio.ObtenerPorEmpleado(dto.IdEmpleado, desde, hasta);
+        return guardadas.Select(ADto).ToList();
+    }
+
+    public async Task<VacacionesAnioDto> ObtenerVacaciones(int idEmpleado, int? anio)
+    {
+        ValidarAnio(anio);
+
+        if (await _empleadoRepositorio.ObtenerPorId(idEmpleado) == null)
+        {
+            throw new ReglaNegocioException("El empleado no existe.", 404);
+        }
+
+        var fechas = await _asistenciaRepositorio.ObtenerFechasPorEstado(idEmpleado, "VACACIONES",
+            new DateOnly(anio.Value, 1, 1), new DateOnly(anio.Value, 12, 31));
+        var hoy = Hoy();
+
+        return new VacacionesAnioDto
+        {
+            Anio = anio.Value,
+            DiasTomados = fechas.Count(f => f <= hoy),
+            DiasProgramados = fechas.Count(f => f > hoy)
+        };
     }
 
     public async Task Eliminar(int idAsistencia)
@@ -180,11 +268,28 @@ public class AsistenciaServicio : IAsistenciaServicio
         await _unidadTrabajo.GuardarCambiosAsync();
     }
 
+    private static DateOnly Hoy()
+    {
+        return DateOnly.FromDateTime(DateTime.Today);
+    }
+
+    private static AsistenciaDto ADto(Asistencia asistencia)
+    {
+        return new AsistenciaDto
+        {
+            IdAsistencia = asistencia.IdAsistencia,
+            Fecha = asistencia.Fecha,
+            Estado = asistencia.Estado,
+            HorasExtra = asistencia.HorasExtra,
+            Observacion = asistencia.Observacion
+        };
+    }
+
     private static void ValidarFecha(DateOnly fecha)
     {
-        if (fecha > DateOnly.FromDateTime(DateTime.Today))
+        if (fecha > Hoy())
         {
-            throw new ReglaNegocioException("No se pueden registrar asistencias de fechas futuras.");
+            throw new ReglaNegocioException("No se pueden consultar ni registrar asistencias de fechas futuras.");
         }
     }
 
@@ -199,12 +304,17 @@ public class AsistenciaServicio : IAsistenciaServicio
         return $"{asistencias.Count}-{ultimoCambio.Ticks}";
     }
 
-    private static (DateOnly Desde, DateOnly Hasta) RangoDelMes(int? anio, int? mes)
+    private static void ValidarAnio(int? anio)
     {
         if (anio is null or < 2000 or > 2100)
         {
             throw new ReglaNegocioException("El año debe estar entre 2000 y 2100.");
         }
+    }
+
+    private static (DateOnly Desde, DateOnly Hasta) RangoDelMes(int? anio, int? mes)
+    {
+        ValidarAnio(anio);
         if (mes is null or < 1 or > 12)
         {
             throw new ReglaNegocioException("El mes debe estar entre 1 y 12.");

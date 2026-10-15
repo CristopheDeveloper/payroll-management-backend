@@ -133,7 +133,8 @@ app.UseExceptionHandler(new ExceptionHandlerOptions
             await Results.Problem(
                 title: "Regla de negocio",
                 detail: reglaNegocio.Message,
-                statusCode: reglaNegocio.CodigoHttp
+                statusCode: reglaNegocio.CodigoHttp,
+                extensions: reglaNegocio.Codigo == null ? null : new Dictionary<string, object> { ["codigo"] = reglaNegocio.Codigo }
             ).ExecuteAsync(context);
             return;
         }
