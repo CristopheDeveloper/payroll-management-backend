@@ -183,7 +183,6 @@ public class AsistenciaServicio : IAsistenciaServicio
         {
             throw new ReglaNegocioException("No se pueden registrar ausencias con más de un año de anticipación.");
         }
-        await PlanillaCerrada.Validar(_nominaRepositorio, desde, hasta);
 
         var empleado = await _empleadoRepositorio.ObtenerPorId(dto.IdEmpleado)
             ?? throw new ReglaNegocioException("El empleado no existe.", 404);
@@ -202,6 +201,7 @@ public class AsistenciaServicio : IAsistenciaServicio
         {
             throw new ReglaNegocioException("El rango no tiene días hábiles.");
         }
+        await PlanillaCerrada.Validar(_nominaRepositorio, dias[0], dias[^1]);
 
         var fuera = dias
             .Where(d => !empleado.PeriodoLaboral.Any(p => p.FechaIngreso <= d && (p.FechaBaja == null || p.FechaBaja >= d)))

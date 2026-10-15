@@ -252,9 +252,17 @@ public class NominaServicio : INominaServicio
         }
         _nominaRepositorio.FijarVersion(nomina, version);
 
+        if (nomina.Estado == "CERRADA")
+        {
+            throw new ReglaNegocioException("La planilla ya está cerrada.", 409);
+        }
         if (nomina.Estado != "CALCULADA")
         {
             throw new ReglaNegocioException("Solo se puede cerrar una planilla calculada.", 409);
+        }
+        if (!nomina.Version.SequenceEqual(version))
+        {
+            throw new ReglaNegocioException("Otra persona modificó la planilla; recárguela y revísela antes de cerrar.", 409, "RECARGAR");
         }
 
         var datos = await CargarDatosMes(nomina);
