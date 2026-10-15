@@ -20,6 +20,12 @@ public partial class PlanillaDbContext : DbContext
 
     public virtual DbSet<Empleado> Empleado { get; set; }
 
+    public virtual DbSet<MovimientoNomina> MovimientoNomina { get; set; }
+
+    public virtual DbSet<Nomina> Nomina { get; set; }
+
+    public virtual DbSet<NominaDetalle> NominaDetalle { get; set; }
+
     public virtual DbSet<Parametro> Parametro { get; set; }
 
     public virtual DbSet<PeriodoLaboral> PeriodoLaboral { get; set; }
@@ -27,6 +33,8 @@ public partial class PlanillaDbContext : DbContext
     public virtual DbSet<Puesto> Puesto { get; set; }
 
     public virtual DbSet<Rol> Rol { get; set; }
+
+    public virtual DbSet<Rubro> Rubro { get; set; }
 
     public virtual DbSet<Usuario> Usuario { get; set; }
 
@@ -71,6 +79,53 @@ public partial class PlanillaDbContext : DbContext
                 .HasConstraintName("FK_Empleado_Puesto");
         });
 
+        modelBuilder.Entity<MovimientoNomina>(entity =>
+        {
+            entity.Property(e => e.FechaIng).HasDefaultValueSql("(sysdatetime())", "DF_MovimientoNomina_FechaIng");
+
+            entity.HasOne(d => d.IdEmpleadoNavigation).WithMany(p => p.MovimientoNomina)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_MovimientoNomina_Empleado");
+
+            entity.HasOne(d => d.IdNominaNavigation).WithMany(p => p.MovimientoNomina)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_MovimientoNomina_Nomina");
+
+            entity.HasOne(d => d.IdRubroNavigation).WithMany(p => p.MovimientoNomina)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_MovimientoNomina_Rubro");
+        });
+
+        modelBuilder.Entity<Nomina>(entity =>
+        {
+            entity.Property(e => e.Estado).HasDefaultValue("BORRADOR", "DF_Nomina_Estado");
+            entity.Property(e => e.FechaIng).HasDefaultValueSql("(sysdatetime())", "DF_Nomina_FechaIng");
+            entity.Property(e => e.Version)
+                .IsRowVersion()
+                .IsConcurrencyToken();
+        });
+
+        modelBuilder.Entity<NominaDetalle>(entity =>
+        {
+            entity.Property(e => e.FechaIng).HasDefaultValueSql("(sysdatetime())", "DF_NominaDetalle_FechaIng");
+
+            entity.HasOne(d => d.IdDepartamentoNavigation).WithMany(p => p.NominaDetalle)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_NominaDetalle_Departamento");
+
+            entity.HasOne(d => d.IdEmpleadoNavigation).WithMany(p => p.NominaDetalle)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_NominaDetalle_Empleado");
+
+            entity.HasOne(d => d.IdNominaNavigation).WithMany(p => p.NominaDetalle)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_NominaDetalle_Nomina");
+
+            entity.HasOne(d => d.IdPuestoNavigation).WithMany(p => p.NominaDetalle)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_NominaDetalle_Puesto");
+        });
+
         modelBuilder.Entity<Parametro>(entity =>
         {
             entity.Property(e => e.FechaIng).HasDefaultValueSql("(sysdatetime())", "DF_Parametro_FechaIng");
@@ -99,6 +154,12 @@ public partial class PlanillaDbContext : DbContext
         {
             entity.Property(e => e.Activo).HasDefaultValue(true, "DF_Rol_Activo");
             entity.Property(e => e.FechaIng).HasDefaultValueSql("(sysdatetime())", "DF_Rol_FechaIng");
+        });
+
+        modelBuilder.Entity<Rubro>(entity =>
+        {
+            entity.Property(e => e.Activo).HasDefaultValue(true, "DF_Rubro_Activo");
+            entity.Property(e => e.FechaIng).HasDefaultValueSql("(sysdatetime())", "DF_Rubro_FechaIng");
         });
 
         modelBuilder.Entity<Usuario>(entity =>

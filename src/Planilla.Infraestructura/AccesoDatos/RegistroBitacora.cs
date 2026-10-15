@@ -11,7 +11,7 @@ public class RegistroBitacora
 {
     private static readonly HashSet<string> CamposExcluidos =
     [
-        "UsuarioIng", "FechaIng", "UsuarioAct", "FechaAct"
+        "UsuarioIng", "FechaIng", "UsuarioAct", "FechaAct", "Version"
     ];
 
     private static readonly JsonSerializerOptions OpcionesJson = new()

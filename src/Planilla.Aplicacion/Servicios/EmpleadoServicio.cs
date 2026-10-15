@@ -12,16 +12,18 @@ public class EmpleadoServicio : IEmpleadoServicio
     private readonly IPuestoRepositorio _puestoRepositorio;
     private readonly IDepartamentoRepositorio _departamentoRepositorio;
     private readonly IAsistenciaRepositorio _asistenciaRepositorio;
+    private readonly INominaRepositorio _nominaRepositorio;
     private readonly IUnidadTrabajo _unidadTrabajo;
 
     public EmpleadoServicio(IEmpleadoRepositorio empleadoRepositorio, IPuestoRepositorio puestoRepositorio,
         IDepartamentoRepositorio departamentoRepositorio, IAsistenciaRepositorio asistenciaRepositorio,
-        IUnidadTrabajo unidadTrabajo)
+        INominaRepositorio nominaRepositorio, IUnidadTrabajo unidadTrabajo)
     {
         _empleadoRepositorio = empleadoRepositorio;
         _puestoRepositorio = puestoRepositorio;
         _departamentoRepositorio = departamentoRepositorio;
         _asistenciaRepositorio = asistenciaRepositorio;
+        _nominaRepositorio = nominaRepositorio;
         _unidadTrabajo = unidadTrabajo;
     }
 
@@ -69,6 +71,7 @@ public class EmpleadoServicio : IEmpleadoServicio
         {
             throw new ReglaNegocioException("La fecha de ingreso debe ser posterior a la fecha de nacimiento.");
         }
+        await PlanillaCerrada.Validar(_nominaRepositorio, fechaIngreso, DateOnly.MaxValue);
 
         var empleado = new Empleado { Activo = true };
         AsignarDatos(empleado, dto, dpi);
@@ -133,6 +136,7 @@ public class EmpleadoServicio : IEmpleadoServicio
         {
             throw new ReglaNegocioException("El motivo es obligatorio cuando el tipo de baja es OTRO.");
         }
+        await PlanillaCerrada.Validar(_nominaRepositorio, fechaBaja, DateOnly.MaxValue);
 
         var hoy = Hoy();
         var posteriores = await _asistenciaRepositorio.ObtenerFechas(idEmpleado, fechaBaja.AddDays(1), null);
@@ -187,6 +191,7 @@ public class EmpleadoServicio : IEmpleadoServicio
         {
             throw new ReglaNegocioException($"La fecha de ingreso debe ser posterior a la última fecha de baja ({ultimo.FechaBaja.Value:dd'/'MM'/'yyyy}).");
         }
+        await PlanillaCerrada.Validar(_nominaRepositorio, fechaIngreso, DateOnly.MaxValue);
 
         await ValidarPuesto(dto.IdPuesto, null);
         await ValidarDepartamento(dto.IdDepartamento, null);
@@ -235,6 +240,7 @@ public class EmpleadoServicio : IEmpleadoServicio
         {
             throw new ReglaNegocioException($"La fecha de ingreso no puede ser posterior a la fecha de baja del periodo ({ultimo.FechaBaja.Value:dd'/'MM'/'yyyy}).");
         }
+        await PlanillaCerrada.Validar(_nominaRepositorio, fechaIngreso < ultimo.FechaIngreso ? fechaIngreso : ultimo.FechaIngreso, DateOnly.MaxValue);
 
         if (fechaIngreso > ultimo.FechaIngreso)
         {

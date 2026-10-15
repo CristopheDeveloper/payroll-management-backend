@@ -101,13 +101,21 @@ public class ParametroServicio : IParametroServicio
         {
             throw new ReglaNegocioException("Las horas del mes deben ser mayores a 0.");
         }
-        if (clave == ClavesParametro.FactorHoraExtra && numero < 1)
+        if (clave == ClavesParametro.FactorHoraExtra && (numero < 1 || numero > 10))
         {
-            throw new ReglaNegocioException("El factor de hora extra debe ser mayor o igual a 1.");
+            throw new ReglaNegocioException("El factor de hora extra debe estar entre 1 y 10.");
         }
         if (Porcentajes.Contains(clave) && numero > 100)
         {
             throw new ReglaNegocioException("El porcentaje debe estar entre 0 y 100.");
+        }
+        if ((Porcentajes.Contains(clave) || clave == ClavesParametro.FactorHoraExtra) && numero != Math.Round(numero, 4))
+        {
+            throw new ReglaNegocioException("El valor debe tener como máximo 4 decimales.");
+        }
+        if (clave == ClavesParametro.BonificacionIncentivo && numero != Math.Round(numero, 2))
+        {
+            throw new ReglaNegocioException("La bonificación debe tener como máximo 2 decimales.");
         }
     }
 

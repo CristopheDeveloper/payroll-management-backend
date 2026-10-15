@@ -34,4 +34,7 @@ public partial class Departamento
 
     [InverseProperty("IdDepartamentoNavigation")]
     public virtual ICollection<Empleado> Empleado { get; set; } = new List<Empleado>();
+
+    [InverseProperty("IdDepartamentoNavigation")]
+    public virtual ICollection<NominaDetalle> NominaDetalle { get; set; } = new List<NominaDetalle>();
 }

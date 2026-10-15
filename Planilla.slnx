@@ -9,6 +9,10 @@
     <File Path="database/07_Empleado.sql" />
     <File Path="database/08_PeriodoLaboral.sql" />
     <File Path="database/09_Asistencia.sql" />
+    <File Path="database/10_Rubro.sql" />
+    <File Path="database/11_Nomina.sql" />
+    <File Path="database/12_MovimientoNomina.sql" />
+    <File Path="database/13_NominaDetalle.sql" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Planilla.Api/Planilla.Api.csproj" />

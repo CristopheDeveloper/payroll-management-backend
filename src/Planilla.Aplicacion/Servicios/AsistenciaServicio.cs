@@ -9,13 +9,15 @@ public class AsistenciaServicio : IAsistenciaServicio
 {
     private readonly IAsistenciaRepositorio _asistenciaRepositorio;
     private readonly IEmpleadoRepositorio _empleadoRepositorio;
+    private readonly INominaRepositorio _nominaRepositorio;
     private readonly IUnidadTrabajo _unidadTrabajo;
 
     public AsistenciaServicio(IAsistenciaRepositorio asistenciaRepositorio, IEmpleadoRepositorio empleadoRepositorio,
-        IUnidadTrabajo unidadTrabajo)
+        INominaRepositorio nominaRepositorio, IUnidadTrabajo unidadTrabajo)
     {
         _asistenciaRepositorio = asistenciaRepositorio;
         _empleadoRepositorio = empleadoRepositorio;
+        _nominaRepositorio = nominaRepositorio;
         _unidadTrabajo = unidadTrabajo;
     }
 
@@ -59,6 +61,7 @@ public class AsistenciaServicio : IAsistenciaServicio
     {
         var fecha = dto.Fecha.Value;
         ValidarFecha(fecha);
+        await PlanillaCerrada.Validar(_nominaRepositorio, fecha, fecha);
 
         if (dto.Registros.Any(r => r == null))
         {
@@ -180,6 +183,7 @@ public class AsistenciaServicio : IAsistenciaServicio
         {
             throw new ReglaNegocioException("No se pueden registrar ausencias con más de un año de anticipación.");
         }
+        await PlanillaCerrada.Validar(_nominaRepositorio, desde, hasta);
 
         var empleado = await _empleadoRepositorio.ObtenerPorId(dto.IdEmpleado)
             ?? throw new ReglaNegocioException("El empleado no existe.", 404);
@@ -263,6 +267,7 @@ public class AsistenciaServicio : IAsistenciaServicio
     {
         var asistencia = await _asistenciaRepositorio.ObtenerParaModificar(idAsistencia)
             ?? throw new ReglaNegocioException("La asistencia no existe.", 404);
+        await PlanillaCerrada.Validar(_nominaRepositorio, asistencia.Fecha, asistencia.Fecha);
 
         _asistenciaRepositorio.Eliminar(asistencia);
         await _unidadTrabajo.GuardarCambiosAsync();

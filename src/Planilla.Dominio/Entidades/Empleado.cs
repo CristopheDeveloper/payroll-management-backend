@@ -100,5 +100,11 @@ public partial class Empleado
     public virtual Puesto IdPuestoNavigation { get; set; }
 
     [InverseProperty("IdEmpleadoNavigation")]
+    public virtual ICollection<MovimientoNomina> MovimientoNomina { get; set; } = new List<MovimientoNomina>();
+
+    [InverseProperty("IdEmpleadoNavigation")]
+    public virtual ICollection<NominaDetalle> NominaDetalle { get; set; } = new List<NominaDetalle>();
+
+    [InverseProperty("IdEmpleadoNavigation")]
     public virtual ICollection<PeriodoLaboral> PeriodoLaboral { get; set; } = new List<PeriodoLaboral>();
 }
