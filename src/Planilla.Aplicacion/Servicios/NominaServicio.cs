@@ -532,22 +532,23 @@ public class NominaServicio : INominaServicio
 
         return new ParametrosNomina
         {
-            IgssLaboral = LeerDecimal(valores, ClavesParametro.IgssLaboral, 0, 100),
-            IgssPatronal = LeerDecimal(valores, ClavesParametro.IgssPatronal, 0, 100),
-            Irtra = LeerDecimal(valores, ClavesParametro.Irtra, 0, 100),
-            Intecap = LeerDecimal(valores, ClavesParametro.Intecap, 0, 100),
-            BonificacionIncentivo = LeerDecimal(valores, ClavesParametro.BonificacionIncentivo, 0, 99999999.99m),
-            FactorHoraExtra = LeerDecimal(valores, ClavesParametro.FactorHoraExtra, 1, 10),
-            DiasMes = (int)LeerDecimal(valores, ClavesParametro.DiasMes, 1, 31),
-            HorasMes = (int)LeerDecimal(valores, ClavesParametro.HorasMes, 1, 999)
+            IgssLaboral = LeerDecimal(valores, ClavesParametro.IgssLaboral, 0, 100, 4),
+            IgssPatronal = LeerDecimal(valores, ClavesParametro.IgssPatronal, 0, 100, 4),
+            Irtra = LeerDecimal(valores, ClavesParametro.Irtra, 0, 100, 4),
+            Intecap = LeerDecimal(valores, ClavesParametro.Intecap, 0, 100, 4),
+            BonificacionIncentivo = LeerDecimal(valores, ClavesParametro.BonificacionIncentivo, 0, 99999999.99m, 2),
+            FactorHoraExtra = LeerDecimal(valores, ClavesParametro.FactorHoraExtra, 1, 10, 4),
+            DiasMes = (int)LeerDecimal(valores, ClavesParametro.DiasMes, 1, 31, 0),
+            HorasMes = (int)LeerDecimal(valores, ClavesParametro.HorasMes, 1, 999, 0)
         };
     }
 
-    private static decimal LeerDecimal(Dictionary<string, string> valores, string clave, decimal minimo, decimal maximo)
+    private static decimal LeerDecimal(Dictionary<string, string> valores, string clave, decimal minimo, decimal maximo,
+        int decimales)
     {
         if (!valores.TryGetValue(clave, out var texto)
             || !decimal.TryParse(texto, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var valor)
-            || valor < minimo || valor > maximo)
+            || valor < minimo || valor > maximo || valor != Math.Round(valor, decimales))
         {
             throw new InvalidOperationException($"El parámetro {clave} no existe o no es válido.");
         }

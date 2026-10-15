@@ -97,9 +97,9 @@ public class ParametroServicio : IParametroServicio
         {
             throw new ReglaNegocioException("Los días del mes deben estar entre 1 y 31.");
         }
-        if (clave == ClavesParametro.HorasMes && numero <= 0)
+        if (clave == ClavesParametro.HorasMes && (numero < 1 || numero > 999))
         {
-            throw new ReglaNegocioException("Las horas del mes deben ser mayores a 0.");
+            throw new ReglaNegocioException("Las horas del mes deben estar entre 1 y 999.");
         }
         if (clave == ClavesParametro.FactorHoraExtra && (numero < 1 || numero > 10))
         {
