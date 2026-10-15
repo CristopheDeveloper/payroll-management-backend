@@ -22,33 +22,65 @@ jobs:
     environment: production
 
     steps:
-      # 1. Descargar codigo
+      # 1. Configurar SSH antes de compilar
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_KEY }}
+          SSH_HOST_KEY: ${{ secrets.VPS_HOST_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+          printf '%s\n' "$SSH_HOST_KEY" | tr -d '\r' > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+          ssh-keygen -F "$VPS_HOST" -f ~/.ssh/known_hosts > /dev/null || {
+            echo "ERROR: VPS_HOST no coincide con VPS_HOST_KEY"
+            exit 1
+          }
+
+      # 2. Probar conexion SSH
+      - name: Test SSH connection
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 \
+            "$VPS_USER@$VPS_HOST" "whoami"
+
+      # 3. Descargar codigo
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      # 2. Configurar .NET 10
+      # 4. Configurar .NET 10
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
 
-      # 3. Restaurar dependencias
+      # 5. Restaurar dependencias
       - name: Restore dependencies
         run: dotnet restore Planilla.slnx
 
-      # 4. Compilar solucion
+      # 6. Compilar solucion
       - name: Build solution
         run: dotnet build Planilla.slnx --configuration Release --no-restore
 
-      # 5. Ejecutar pruebas
+      # 7. Ejecutar pruebas
       - name: Run unit tests
         run: dotnet test Planilla.slnx --configuration Release --no-build
 
-      # 6. Configurar Docker Buildx
+      # 8. Configurar Docker Buildx
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      # 7. Construir imagen Docker
+      # 9. Construir imagen Docker
       - name: Build Docker image
         uses: docker/build-push-action@v7
         with:
@@ -58,36 +90,11 @@ jobs:
           load: true
           tags: planilla-api:prod
 
-      # 8. Exportar imagen Docker
+      # 10. Exportar imagen
       - name: Export Docker image
         run: docker save -o planilla-api.tar planilla-api:prod
 
-      # 9. Configurar SSH
-      - name: Configure SSH
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_KEY }}
-          SSH_HOST_KEY: ${{ secrets.VPS_HOST_KEY }}
-        run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-
-          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-
-          printf '%s\n' "$SSH_HOST_KEY" > ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
-
-      # 10. Verificar conexion SSH
-      - name: Test SSH connection
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-        run: |
-          ssh -o BatchMode=yes \
-            -o StrictHostKeyChecking=yes \
-            "$VPS_USER@$VPS_HOST" "whoami"
-
-      # 11. Preparar directorio de despliegue
+      # 11. Preparar directorio en VPS
       - name: Prepare deployment directory
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -98,7 +105,7 @@ jobs:
             "$VPS_USER@$VPS_HOST" \
             "mkdir -p /home/deploy_payroll/releases"
 
-      # 12. Enviar imagen al VPS
+      # 12. Enviar imagen Docker
       - name: Upload Docker image
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -109,7 +116,7 @@ jobs:
             planilla-api.tar \
             "$VPS_USER@$VPS_HOST:/home/deploy_payroll/releases/planilla-api.tar"
 
-      # 13. Desplegar en produccion
+      # 13. Desplegar backend
       - name: Deploy production backend
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -120,7 +127,7 @@ jobs:
             "$VPS_USER@$VPS_HOST" \
             "sudo -n /usr/local/sbin/payroll-deploy prod backend"
 
-      # 14. Verificar despliegue
+      # 14. Comprobar contenedor
       - name: Verify deployment
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
