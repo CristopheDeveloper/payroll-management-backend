@@ -6,6 +6,8 @@
     <File Path="database/04_Departamento.sql" />
     <File Path="database/05_Puesto.sql" />
     <File Path="database/06_Parametro.sql" />
+    <File Path="database/07_Empleado.sql" />
+    <File Path="database/08_PeriodoLaboral.sql" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Planilla.Api/Planilla.Api.csproj" />

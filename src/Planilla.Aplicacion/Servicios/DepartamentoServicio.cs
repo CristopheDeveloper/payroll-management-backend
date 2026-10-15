@@ -8,11 +8,14 @@ namespace Planilla.Aplicacion.Servicios;
 public class DepartamentoServicio : IDepartamentoServicio
 {
     private readonly IDepartamentoRepositorio _departamentoRepositorio;
+    private readonly IEmpleadoRepositorio _empleadoRepositorio;
     private readonly IUnidadTrabajo _unidadTrabajo;
 
-    public DepartamentoServicio(IDepartamentoRepositorio departamentoRepositorio, IUnidadTrabajo unidadTrabajo)
+    public DepartamentoServicio(IDepartamentoRepositorio departamentoRepositorio, IEmpleadoRepositorio empleadoRepositorio,
+        IUnidadTrabajo unidadTrabajo)
     {
         _departamentoRepositorio = departamentoRepositorio;
+        _empleadoRepositorio = empleadoRepositorio;
         _unidadTrabajo = unidadTrabajo;
     }
 
@@ -72,6 +75,10 @@ public class DepartamentoServicio : IDepartamentoServicio
     public async Task Desactivar(int idDepartamento)
     {
         var departamento = await ObtenerParaModificar(idDepartamento);
+        if (await _empleadoRepositorio.ExistenActivosEnDepartamento(idDepartamento))
+        {
+            throw new ReglaNegocioException("No se puede desactivar el departamento porque tiene empleados activos asignados.", 409);
+        }
 
         departamento.Activo = false;
         await _unidadTrabajo.GuardarCambiosAsync();

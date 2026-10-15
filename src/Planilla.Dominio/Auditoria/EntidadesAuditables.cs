@@ -11,3 +11,7 @@ public partial class Departamento : IAuditable { }
 public partial class Puesto : IAuditable { }
 
 public partial class Parametro : IAuditable { }
+
+public partial class Empleado : IAuditable { }
+
+public partial class PeriodoLaboral : IAuditable { }

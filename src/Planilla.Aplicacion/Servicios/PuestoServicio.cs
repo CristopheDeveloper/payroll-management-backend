@@ -8,11 +8,14 @@ namespace Planilla.Aplicacion.Servicios;
 public class PuestoServicio : IPuestoServicio
 {
     private readonly IPuestoRepositorio _puestoRepositorio;
+    private readonly IEmpleadoRepositorio _empleadoRepositorio;
     private readonly IUnidadTrabajo _unidadTrabajo;
 
-    public PuestoServicio(IPuestoRepositorio puestoRepositorio, IUnidadTrabajo unidadTrabajo)
+    public PuestoServicio(IPuestoRepositorio puestoRepositorio, IEmpleadoRepositorio empleadoRepositorio,
+        IUnidadTrabajo unidadTrabajo)
     {
         _puestoRepositorio = puestoRepositorio;
+        _empleadoRepositorio = empleadoRepositorio;
         _unidadTrabajo = unidadTrabajo;
     }
 
@@ -72,6 +75,10 @@ public class PuestoServicio : IPuestoServicio
     public async Task Desactivar(int idPuesto)
     {
         var puesto = await ObtenerParaModificar(idPuesto);
+        if (await _empleadoRepositorio.ExistenActivosEnPuesto(idPuesto))
+        {
+            throw new ReglaNegocioException("No se puede desactivar el puesto porque tiene empleados activos asignados.", 409);
+        }
 
         puesto.Activo = false;
         await _unidadTrabajo.GuardarCambiosAsync();
