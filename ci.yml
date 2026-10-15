@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - main
-
   workflow_dispatch:
 
 permissions:
@@ -19,16 +18,17 @@ jobs:
   build-and-deploy:
     name: Build, Test and Deploy
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment: production
 
     steps:
-      # 1. Descargar el codigo
+      # 1. Descargar codigo
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # 2. Configurar .NET 10
       - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
 
@@ -40,17 +40,17 @@ jobs:
       - name: Build solution
         run: dotnet build Planilla.slnx --configuration Release --no-restore
 
-      # 5. Ejecutar pruebas unitarias
+      # 5. Ejecutar pruebas
       - name: Run unit tests
         run: dotnet test Planilla.slnx --configuration Release --no-build
 
       # 6. Configurar Docker Buildx
       - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       # 7. Construir imagen Docker
       - name: Build Docker image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./Dockerfile
@@ -87,7 +87,18 @@ jobs:
             -o StrictHostKeyChecking=yes \
             "$VPS_USER@$VPS_HOST" "whoami"
 
-      # 11. Enviar imagen Docker al VPS
+      # 11. Preparar directorio de despliegue
+      - name: Prepare deployment directory
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            "$VPS_USER@$VPS_HOST" \
+            "mkdir -p /home/deploy_payroll/releases"
+
+      # 12. Enviar imagen al VPS
       - name: Upload Docker image
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -98,7 +109,7 @@ jobs:
             planilla-api.tar \
             "$VPS_USER@$VPS_HOST:/home/deploy_payroll/releases/planilla-api.tar"
 
-      # 12. Desplegar API en produccion
+      # 13. Desplegar en produccion
       - name: Deploy production backend
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -109,7 +120,7 @@ jobs:
             "$VPS_USER@$VPS_HOST" \
             "sudo -n /usr/local/sbin/payroll-deploy prod backend"
 
-      # 13. Verificar contenedor
+      # 14. Verificar despliegue
       - name: Verify deployment
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -118,4 +129,4 @@ jobs:
           ssh -o BatchMode=yes \
             -o StrictHostKeyChecking=yes \
             "$VPS_USER@$VPS_HOST" \
-            "curl --fail --silent --show-error --max-time 15 http://127.0.0.1:8510/"
+            "curl --fail --silent --show-error --retry 5 --retry-delay 3 --max-time 15 http://127.0.0.1:8510/"
