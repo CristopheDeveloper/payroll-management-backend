@@ -16,9 +16,6 @@ using Planilla.Infraestructura.Seguridad;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
-// Base de datos
 builder.Services.AddDbContext<PlanillaDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddScoped<IUnidadTrabajo, UnidadTrabajo>();
@@ -27,18 +24,17 @@ builder.Services.AddScoped<RegistroBitacora>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IUsuarioActual, UsuarioActual>();
 
-// Repositorios
 builder.Services.AddScoped<IUsuarioRepositorio, UsuarioRepositorio>();
 builder.Services.AddScoped<IDepartamentoRepositorio, DepartamentoRepositorio>();
 builder.Services.AddScoped<IPuestoRepositorio, PuestoRepositorio>();
+builder.Services.AddScoped<IParametroRepositorio, ParametroRepositorio>();
 
-// Servicios
 builder.Services.AddScoped<IAutenticacionServicio, AutenticacionServicio>();
 builder.Services.AddScoped<IUsuarioServicio, UsuarioServicio>();
 builder.Services.AddScoped<IDepartamentoServicio, DepartamentoServicio>();
 builder.Services.AddScoped<IPuestoServicio, PuestoServicio>();
+builder.Services.AddScoped<IParametroServicio, ParametroServicio>();
 
-// JWT
 var claveJwt = builder.Configuration["Jwt:Clave"];
 if (string.IsNullOrWhiteSpace(claveJwt) || claveJwt.Length < 32)
 {
@@ -66,7 +62,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
         options.Events = new JwtBearerEvents
         {
-            // Además de la firma y la fecha, revisa en la base que el usuario siga activo y con el mismo rol
             OnTokenValidated = async context =>
             {
                 var idUsuario = context.Principal?.FindFirst("usuarioId")?.Value;
@@ -87,7 +82,6 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddSingleton<IGeneradorToken>(new GeneradorToken(claveJwt, emisorJwt, audienciaJwt, duracionJwt));
 builder.Services.AddSingleton<IHashContrasena, HashContrasena>();
 
-// CORS
 var origenesPermitidos = builder.Configuration.GetSection("Cors:OrigenesPermitidos").Get<string[]>() ?? [];
 builder.Services.AddCors(options =>
 {
@@ -99,7 +93,6 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddControllers();
 builder.Services.AddProblemDetails();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi(options =>
 {
     options.AddDocumentTransformer((document, context, cancellationToken) =>
@@ -124,7 +117,6 @@ builder.Services.AddOpenApi(options =>
 
 var app = builder.Build();
 
-// Manejo global de errores
 app.UseExceptionHandler(new ExceptionHandlerOptions
 {
     SuppressDiagnosticsCallback = contexto => true,
@@ -163,7 +155,6 @@ app.UseExceptionHandler(new ExceptionHandlerOptions
     }
 });
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi().AllowAnonymous();

@@ -21,7 +21,6 @@ public class AutenticacionServicio : IAutenticacionServicio
     {
         var usuario = await _usuarioRepositorio.ObtenerPorNombreUsuario(dto.NombreUsuario.Trim());
 
-        // Mismo mensaje en todos los casos, para no revelar qué usuarios existen o están inactivos
         if (usuario == null
             || !usuario.Activo
             || !usuario.IdRolNavigation.Activo

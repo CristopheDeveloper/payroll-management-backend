@@ -16,6 +16,8 @@ public partial class PlanillaDbContext : DbContext
 
     public virtual DbSet<Departamento> Departamento { get; set; }
 
+    public virtual DbSet<Parametro> Parametro { get; set; }
+
     public virtual DbSet<Puesto> Puesto { get; set; }
 
     public virtual DbSet<Rol> Rol { get; set; }
@@ -33,6 +35,11 @@ public partial class PlanillaDbContext : DbContext
         {
             entity.Property(e => e.Activo).HasDefaultValue(true, "DF_Departamento_Activo");
             entity.Property(e => e.FechaIng).HasDefaultValueSql("(sysdatetime())", "DF_Departamento_FechaIng");
+        });
+
+        modelBuilder.Entity<Parametro>(entity =>
+        {
+            entity.Property(e => e.FechaIng).HasDefaultValueSql("(sysdatetime())", "DF_Parametro_FechaIng");
         });
 
         modelBuilder.Entity<Puesto>(entity =>
