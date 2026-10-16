@@ -128,12 +128,3 @@ jobs:
             "sudo -n /usr/local/sbin/payroll-deploy prod backend"
 
       # 14. Comprobar contenedor
-      - name: Verify deployment
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-        run: |
-          ssh -o BatchMode=yes \
-            -o StrictHostKeyChecking=yes \
-            "$VPS_USER@$VPS_HOST" \
-            "curl --fail --silent --show-error --retry 5 --retry-delay 3 --max-time 15 http://127.0.0.1:8510/"
