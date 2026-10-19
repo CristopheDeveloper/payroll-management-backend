@@ -12,7 +12,9 @@ using Planilla.Aplicacion.Interfaces;
 using Planilla.Aplicacion.Servicios;
 using Planilla.Infraestructura.AccesoDatos;
 using Planilla.Infraestructura.AccesoDatos.Repositorios;
+using Planilla.Infraestructura.Reportes;
 using Planilla.Infraestructura.Seguridad;
+using QuestPDF.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -43,6 +45,11 @@ builder.Services.AddScoped<IAsistenciaServicio, AsistenciaServicio>();
 builder.Services.AddScoped<IRubroServicio, RubroServicio>();
 builder.Services.AddScoped<INominaServicio, NominaServicio>();
 builder.Services.AddScoped<IMovimientoNominaServicio, MovimientoNominaServicio>();
+builder.Services.AddScoped<IReporteServicio, ReporteServicio>();
+
+QuestPDF.Settings.License = LicenseType.Community;
+QuestPDF.Settings.ThrowOnMissingTextGlyphs = false;
+builder.Services.AddSingleton<IGeneradorDocumentos, GeneradorDocumentos>();
 
 var claveJwt = builder.Configuration["Jwt:Clave"];
 if (string.IsNullOrWhiteSpace(claveJwt) || claveJwt.Length < 32)
@@ -97,7 +104,8 @@ builder.Services.AddCors(options =>
     options.AddPolicy("Frontend", policy =>
         policy.WithOrigins(origenesPermitidos)
               .AllowAnyHeader()
-              .AllowAnyMethod());
+              .AllowAnyMethod()
+              .WithExposedHeaders("Content-Disposition"));
 });
 
 builder.Services.AddControllers();
