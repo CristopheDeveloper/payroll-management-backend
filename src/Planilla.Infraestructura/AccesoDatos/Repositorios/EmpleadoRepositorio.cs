@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Planilla.Aplicacion.DTOs;
 using Planilla.Aplicacion.Interfaces;
 using Planilla.Dominio.Entidades;
 
@@ -80,22 +79,6 @@ public class EmpleadoRepositorio : IEmpleadoRepositorio
             .Where(p => p.IdEmpleado == idEmpleado)
             .OrderByDescending(p => p.FechaIngreso)
             .ThenByDescending(p => p.IdPeriodoLaboral)
-            .ToListAsync();
-    }
-
-    public async Task<List<HistorialSalarioDto>> ObtenerHistorialSalarios(int idEmpleado)
-    {
-        return await _context.Database
-            .SqlQuery<HistorialSalarioDto>($"""
-                SELECT Fecha,
-                       Usuario,
-                       CAST(JSON_VALUE(ValoresAnteriores, '$.Salario') AS DECIMAL(10,2)) AS SalarioAnterior,
-                       CAST(JSON_VALUE(ValoresNuevos, '$.Salario') AS DECIMAL(10,2)) AS SalarioNuevo
-                FROM Bitacora
-                WHERE Tabla = 'Empleado' AND IdRegistro = {idEmpleado}
-                  AND JSON_VALUE(ValoresNuevos, '$.Salario') IS NOT NULL
-                ORDER BY Fecha, IdBitacora
-                """)
             .ToListAsync();
     }
 

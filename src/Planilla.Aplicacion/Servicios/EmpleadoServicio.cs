@@ -41,12 +41,6 @@ public class EmpleadoServicio : IEmpleadoServicio
         return ADetalleDto(empleado);
     }
 
-    public async Task<List<HistorialSalarioDto>> ObtenerHistorialSalarios(int idEmpleado)
-    {
-        await ObtenerParaModificar(idEmpleado);
-        return await _empleadoRepositorio.ObtenerHistorialSalarios(idEmpleado);
-    }
-
     public async Task<EmpleadoDetalleDto> Contratar(EmpleadoCrearDto dto)
     {
         var dpi = dto.Dpi.Trim();

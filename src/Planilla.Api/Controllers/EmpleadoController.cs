@@ -31,12 +31,6 @@ public class EmpleadoController : ControllerBase
         return await _empleadoServicio.ObtenerPorId(id);
     }
 
-    [HttpGet("{id:int}/historial-salarios")]
-    public async Task<ActionResult<List<HistorialSalarioDto>>> ObtenerHistorialSalarios(int id)
-    {
-        return await _empleadoServicio.ObtenerHistorialSalarios(id);
-    }
-
     [HttpPost]
     public async Task<ActionResult<EmpleadoDetalleDto>> Contratar(EmpleadoCrearDto dto)
     {
