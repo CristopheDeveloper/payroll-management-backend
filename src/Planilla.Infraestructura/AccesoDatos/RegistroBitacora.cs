@@ -7,18 +7,13 @@ using Planilla.Dominio.Entidades;
 
 namespace Planilla.Infraestructura.AccesoDatos;
 
-// Escribe en Bitacora cada INSERT, UPDATE y DELETE. UnidadTrabajo la usa en dos pasos:
-// Recolectar antes de guardar (todavía se conocen los valores anteriores) y
-// Registrar después de guardar (SQL Server ya generó los Ids de los INSERT).
 public class RegistroBitacora
 {
-    // Los campos de auditoría no cuentan como cambios
     private static readonly HashSet<string> CamposExcluidos =
     [
-        "UsuarioIng", "FechaIng", "UsuarioAct", "FechaAct"
+        "UsuarioIng", "FechaIng", "UsuarioAct", "FechaAct", "Version"
     ];
 
-    // Deja las tildes y la ñ legibles en el JSON
     private static readonly JsonSerializerOptions OpcionesJson = new()
     {
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
@@ -47,7 +42,6 @@ public class RegistroBitacora
             switch (entry.State)
             {
                 case EntityState.Added:
-                    // El Id y los valores se leen en Registrar, cuando ya existen
                     cambios.Add(new CambioBitacora(entry, "INSERT"));
                     break;
 
@@ -77,7 +71,6 @@ public class RegistroBitacora
                         nuevos[campo] = prop.CurrentValue;
                     }
 
-                    // Si solo cambiaron campos excluidos, no hay nada que registrar
                     if (anteriores.Count > 0)
                     {
                         cambios.Add(new CambioBitacora(entry, "UPDATE")
@@ -120,7 +113,6 @@ public class RegistroBitacora
         }
     }
 
-    // Todas las tablas tienen una llave primaria INT de una sola columna (Id<Tabla>)
     private static int LeerId(EntityEntry entry)
     {
         var llave = entry.Metadata.FindPrimaryKey().Properties[0].Name;

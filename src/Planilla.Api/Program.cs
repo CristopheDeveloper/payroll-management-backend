@@ -12,13 +12,12 @@ using Planilla.Aplicacion.Interfaces;
 using Planilla.Aplicacion.Servicios;
 using Planilla.Infraestructura.AccesoDatos;
 using Planilla.Infraestructura.AccesoDatos.Repositorios;
+using Planilla.Infraestructura.Reportes;
 using Planilla.Infraestructura.Seguridad;
+using QuestPDF.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
-// Base de datos
 builder.Services.AddDbContext<PlanillaDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddScoped<IUnidadTrabajo, UnidadTrabajo>();
@@ -27,18 +26,31 @@ builder.Services.AddScoped<RegistroBitacora>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IUsuarioActual, UsuarioActual>();
 
-// Repositorios
 builder.Services.AddScoped<IUsuarioRepositorio, UsuarioRepositorio>();
 builder.Services.AddScoped<IDepartamentoRepositorio, DepartamentoRepositorio>();
 builder.Services.AddScoped<IPuestoRepositorio, PuestoRepositorio>();
+builder.Services.AddScoped<IParametroRepositorio, ParametroRepositorio>();
+builder.Services.AddScoped<IEmpleadoRepositorio, EmpleadoRepositorio>();
+builder.Services.AddScoped<IAsistenciaRepositorio, AsistenciaRepositorio>();
+builder.Services.AddScoped<IRubroRepositorio, RubroRepositorio>();
+builder.Services.AddScoped<INominaRepositorio, NominaRepositorio>();
 
-// Servicios
 builder.Services.AddScoped<IAutenticacionServicio, AutenticacionServicio>();
 builder.Services.AddScoped<IUsuarioServicio, UsuarioServicio>();
 builder.Services.AddScoped<IDepartamentoServicio, DepartamentoServicio>();
 builder.Services.AddScoped<IPuestoServicio, PuestoServicio>();
+builder.Services.AddScoped<IParametroServicio, ParametroServicio>();
+builder.Services.AddScoped<IEmpleadoServicio, EmpleadoServicio>();
+builder.Services.AddScoped<IAsistenciaServicio, AsistenciaServicio>();
+builder.Services.AddScoped<IRubroServicio, RubroServicio>();
+builder.Services.AddScoped<INominaServicio, NominaServicio>();
+builder.Services.AddScoped<IMovimientoNominaServicio, MovimientoNominaServicio>();
+builder.Services.AddScoped<IReporteServicio, ReporteServicio>();
 
-// JWT
+QuestPDF.Settings.License = LicenseType.Community;
+QuestPDF.Settings.ThrowOnMissingTextGlyphs = false;
+builder.Services.AddSingleton<IGeneradorDocumentos, GeneradorDocumentos>();
+
 var claveJwt = builder.Configuration["Jwt:Clave"];
 if (string.IsNullOrWhiteSpace(claveJwt) || claveJwt.Length < 32)
 {
@@ -66,7 +78,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
         options.Events = new JwtBearerEvents
         {
-            // Además de la firma y la fecha, revisa en la base que el usuario siga activo y con el mismo rol
             OnTokenValidated = async context =>
             {
                 var idUsuario = context.Principal?.FindFirst("usuarioId")?.Value;
@@ -87,19 +98,18 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddSingleton<IGeneradorToken>(new GeneradorToken(claveJwt, emisorJwt, audienciaJwt, duracionJwt));
 builder.Services.AddSingleton<IHashContrasena, HashContrasena>();
 
-// CORS
 var origenesPermitidos = builder.Configuration.GetSection("Cors:OrigenesPermitidos").Get<string[]>() ?? [];
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Frontend", policy =>
         policy.WithOrigins(origenesPermitidos)
               .AllowAnyHeader()
-              .AllowAnyMethod());
+              .AllowAnyMethod()
+              .WithExposedHeaders("Content-Disposition"));
 });
 
 builder.Services.AddControllers();
 builder.Services.AddProblemDetails();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi(options =>
 {
     options.AddDocumentTransformer((document, context, cancellationToken) =>
@@ -124,7 +134,6 @@ builder.Services.AddOpenApi(options =>
 
 var app = builder.Build();
 
-// Manejo global de errores
 app.UseExceptionHandler(new ExceptionHandlerOptions
 {
     SuppressDiagnosticsCallback = contexto => true,
@@ -137,7 +146,8 @@ app.UseExceptionHandler(new ExceptionHandlerOptions
             await Results.Problem(
                 title: "Regla de negocio",
                 detail: reglaNegocio.Message,
-                statusCode: reglaNegocio.CodigoHttp
+                statusCode: reglaNegocio.CodigoHttp,
+                extensions: reglaNegocio.Codigo == null ? null : new Dictionary<string, object> { ["codigo"] = reglaNegocio.Codigo }
             ).ExecuteAsync(context);
             return;
         }
@@ -163,7 +173,6 @@ app.UseExceptionHandler(new ExceptionHandlerOptions
     }
 });
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi().AllowAnonymous();

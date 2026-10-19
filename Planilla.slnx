@@ -9,6 +9,14 @@
     <File Path="database/03_Bitacora.sql" />
     <File Path="database/04_Departamento.sql" />
     <File Path="database/05_Puesto.sql" />
+    <File Path="database/06_Parametro.sql" />
+    <File Path="database/07_Empleado.sql" />
+    <File Path="database/08_PeriodoLaboral.sql" />
+    <File Path="database/09_Asistencia.sql" />
+    <File Path="database/10_Rubro.sql" />
+    <File Path="database/11_Nomina.sql" />
+    <File Path="database/12_MovimientoNomina.sql" />
+    <File Path="database/13_NominaDetalle.sql" />
   </Folder>
   <Folder Name="/Elementos de la solución/">
     <File Path=".dockerignore" />

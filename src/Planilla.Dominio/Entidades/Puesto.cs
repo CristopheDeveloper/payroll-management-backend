@@ -31,4 +31,10 @@ public partial class Puesto
     public string UsuarioAct { get; set; }
 
     public DateTime? FechaAct { get; set; }
+
+    [InverseProperty("IdPuestoNavigation")]
+    public virtual ICollection<Empleado> Empleado { get; set; } = new List<Empleado>();
+
+    [InverseProperty("IdPuestoNavigation")]
+    public virtual ICollection<NominaDetalle> NominaDetalle { get; set; } = new List<NominaDetalle>();
 }

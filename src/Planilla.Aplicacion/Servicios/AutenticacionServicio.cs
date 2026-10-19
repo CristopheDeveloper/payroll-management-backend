@@ -6,6 +6,8 @@ namespace Planilla.Aplicacion.Servicios;
 
 public class AutenticacionServicio : IAutenticacionServicio
 {
+    private const string HashFalso = "$2b$11$xzoNA8SedleOxqegT1xvGOMMzclTEpDjjqszo.zPDCB9MADZe3uwy";
+
     private readonly IUsuarioRepositorio _usuarioRepositorio;
     private readonly IHashContrasena _hashContrasena;
     private readonly IGeneradorToken _generadorToken;
@@ -20,12 +22,12 @@ public class AutenticacionServicio : IAutenticacionServicio
     public async Task<LoginRespuestaDto> Login(LoginDto dto)
     {
         var usuario = await _usuarioRepositorio.ObtenerPorNombreUsuario(dto.NombreUsuario.Trim());
+        var contrasenaValida = _hashContrasena.Verificar(dto.Contrasena, usuario?.PasswordHash ?? HashFalso);
 
-        // Mismo mensaje en todos los casos, para no revelar qué usuarios existen o están inactivos
         if (usuario == null
             || !usuario.Activo
             || !usuario.IdRolNavigation.Activo
-            || !_hashContrasena.Verificar(dto.Contrasena, usuario.PasswordHash))
+            || !contrasenaValida)
         {
             throw new ReglaNegocioException("Usuario o contraseña incorrectos.", 401);
         }

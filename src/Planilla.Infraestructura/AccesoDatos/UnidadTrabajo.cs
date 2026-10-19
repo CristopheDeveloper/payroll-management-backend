@@ -20,7 +20,6 @@ public class UnidadTrabajo : IUnidadTrabajo
         _auditoria.LlenarCampos(_context.ChangeTracker);
         var cambios = _bitacora.Recolectar(_context.ChangeTracker);
 
-        // El cambio y su bitácora se guardan juntos: si algo falla, no se guarda ninguno
         await using var transaccion = await _context.Database.BeginTransactionAsync();
 
         await _context.SaveChangesAsync();
