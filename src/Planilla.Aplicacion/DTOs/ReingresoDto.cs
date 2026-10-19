@@ -13,6 +13,6 @@ public class ReingresoDto
     [Range(1, int.MaxValue, ErrorMessage = "El departamento es obligatorio.")]
     public int IdDepartamento { get; set; }
 
-    [Range(typeof(decimal), "0.01", "99999999.99", ParseLimitsInInvariantCulture = true, ErrorMessage = "El salario debe estar entre 0.01 y 99,999,999.99.")]
+    [Range(typeof(decimal), "0.01", "999999.99", ParseLimitsInInvariantCulture = true, ErrorMessage = "El salario debe estar entre 0.01 y 999,999.99.")]
     public decimal Salario { get; set; }
 }

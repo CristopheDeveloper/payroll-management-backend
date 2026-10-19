@@ -58,9 +58,9 @@ public class EmpleadoEditarDto
     [Range(1, int.MaxValue, ErrorMessage = "El departamento es obligatorio.")]
     public int IdDepartamento { get; set; }
 
-    [Range(typeof(decimal), "0.01", "99999999.99", ParseLimitsInInvariantCulture = true, ErrorMessage = "El salario debe estar entre 0.01 y 99,999,999.99.")]
+    [Range(typeof(decimal), "0.01", "999999.99", ParseLimitsInInvariantCulture = true, ErrorMessage = "El salario debe estar entre 0.01 y 999,999.99.")]
     public decimal Salario { get; set; }
 
-    [Range(typeof(decimal), "0", "99999999.99", ParseLimitsInInvariantCulture = true, ErrorMessage = "La retención de ISR debe estar entre 0 y 99,999,999.99.")]
+    [Range(typeof(decimal), "0", "999999.99", ParseLimitsInInvariantCulture = true, ErrorMessage = "La retención de ISR debe estar entre 0 y 999,999.99.")]
     public decimal RetencionIsr { get; set; }
 }

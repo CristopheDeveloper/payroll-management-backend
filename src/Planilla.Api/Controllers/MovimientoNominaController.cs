@@ -27,7 +27,8 @@ public class MovimientoNominaController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<MovimientoDto>> Crear(int idNomina, MovimientoGuardarDto dto)
     {
-        return await _movimientoServicio.Crear(idNomina, dto);
+        var creado = await _movimientoServicio.Crear(idNomina, dto);
+        return StatusCode(StatusCodes.Status201Created, creado);
     }
 
     [HttpPut("{idMovimiento:int}")]
