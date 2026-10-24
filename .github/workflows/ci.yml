@@ -128,3 +128,18 @@ jobs:
             "sudo -n /usr/local/sbin/payroll-deploy prod backend"
 
       # 14. Comprobar contenedor
+      - name: Verify production API and CORS
+        run: |
+          headers_file=$(mktemp)
+          trap 'rm -f "$headers_file"' EXIT
+
+          curl --fail --silent --show-error --retry 5 --retry-delay 2 \
+            --dump-header "$headers_file" \
+            --output /dev/null \
+            --request OPTIONS \
+            --header 'Origin: https://payroll.notcodefirst.com' \
+            --header 'Access-Control-Request-Method: POST' \
+            --header 'Access-Control-Request-Headers: content-type' \
+            https://api.notcodefirst.com/api/Autenticacion/login
+
+          grep -Fqi 'Access-Control-Allow-Origin: https://payroll.notcodefirst.com' "$headers_file"
