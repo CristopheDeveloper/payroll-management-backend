@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Planilla.Aplicacion.Interfaces;
 using Planilla.Dominio.Entidades;
+using Planilla.Dominio.Tiempo;
 
 namespace Planilla.Infraestructura.AccesoDatos;
 
@@ -90,7 +91,7 @@ public class RegistroBitacora
     public void Registrar(List<CambioBitacora> cambios)
     {
         var usuario = _usuarioActual.NombreUsuario;
-        var ahora = DateTime.Now;
+        var ahora = RelojGuatemala.Ahora;
 
         foreach (var cambio in cambios)
         {

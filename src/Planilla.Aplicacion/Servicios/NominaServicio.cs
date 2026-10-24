@@ -5,6 +5,7 @@ using Planilla.Aplicacion.Interfaces;
 using Planilla.Dominio.Calculo;
 using Planilla.Dominio.Constantes;
 using Planilla.Dominio.Entidades;
+using Planilla.Dominio.Tiempo;
 
 namespace Planilla.Aplicacion.Servicios;
 
@@ -170,7 +171,7 @@ public class NominaServicio : INominaServicio
 
     public async Task<NominaDto> Calcular(int idNomina, CalcularDto dto)
     {
-        var fechaCalculo = DateTime.Now;
+        var fechaCalculo = RelojGuatemala.Ahora;
 
         var nomina = await _nominaRepositorio.ObtenerParaModificar(idNomina)
             ?? throw new ReglaNegocioException("La planilla no existe.", 404);
@@ -298,7 +299,7 @@ public class NominaServicio : INominaServicio
 
         nomina.Estado = "CERRADA";
         nomina.UsuarioCierre = _usuarioActual.NombreUsuario;
-        nomina.FechaCierre = DateTime.Now;
+        nomina.FechaCierre = RelojGuatemala.Ahora;
         await _unidadTrabajo.GuardarCambiosAsync();
 
         return await ObtenerPorId(idNomina);
@@ -603,7 +604,7 @@ public class NominaServicio : INominaServicio
 
     private static DateOnly Hoy()
     {
-        return DateOnly.FromDateTime(DateTime.Today);
+        return RelojGuatemala.Hoy;
     }
 
     private static NominaDto ADto(Nomina nomina, int cantidadEmpleados, List<AdvertenciaDto> advertencias)

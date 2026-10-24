@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Planilla.Aplicacion.Interfaces;
 using Planilla.Dominio.Auditoria;
+using Planilla.Dominio.Tiempo;
 
 namespace Planilla.Infraestructura.AccesoDatos;
 
@@ -17,7 +18,7 @@ public class Auditoria
     public void LlenarCampos(ChangeTracker changeTracker)
     {
         var usuario = _usuarioActual.NombreUsuario;
-        var ahora = DateTime.Now;
+        var ahora = RelojGuatemala.Ahora;
 
         foreach (var entry in changeTracker.Entries<IAuditable>())
         {

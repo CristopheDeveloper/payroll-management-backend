@@ -22,6 +22,7 @@ COPY --from=build /app/publish .
 
 ENV ASPNETCORE_HTTP_PORTS=8510
 ENV ASPNETCORE_ENVIRONMENT=Production
+ENV TZ=America/Guatemala
 
 EXPOSE 8510
 
