@@ -44,7 +44,6 @@ builder.Services.AddScoped<IEmpleadoServicio, EmpleadoServicio>();
 builder.Services.AddScoped<IAsistenciaServicio, AsistenciaServicio>();
 builder.Services.AddScoped<IRubroServicio, RubroServicio>();
 builder.Services.AddScoped<INominaServicio, NominaServicio>();
-builder.Services.AddScoped<IMovimientoNominaServicio, MovimientoNominaServicio>();
 builder.Services.AddScoped<IReporteServicio, ReporteServicio>();
 
 QuestPDF.Settings.License = LicenseType.Community;

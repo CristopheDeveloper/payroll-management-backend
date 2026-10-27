@@ -83,7 +83,7 @@ public class GeneradorDocumentos : IGeneradorDocumentos
         hoja.Cell(1, 1).Style.Font.FontSize = 14;
         hoja.Cell(2, 1).Value = $"NIT: {encabezado.NitEmpresa}";
         hoja.Cell(3, 1).Value = encabezado.DireccionEmpresa;
-        hoja.Cell(4, 1).Value = $"Planilla general de {Periodo(encabezado)}";
+        hoja.Cell(4, 1).Value = $"{encabezado.Codigo} - {encabezado.Descripcion}";
         hoja.Cell(4, 1).Style.Font.Bold = true;
         hoja.Cell(5, 1).Value = Estado(encabezado);
         if (encabezado.Preliminar)
@@ -140,8 +140,6 @@ public class GeneradorDocumentos : IGeneradorDocumentos
         var cuota = new (string Concepto, decimal Monto)[]
         {
             ("IGSS patronal", reporte.CuotaPatronal.IgssPatronal),
-            ("IRTRA", reporte.CuotaPatronal.Irtra),
-            ("INTECAP", reporte.CuotaPatronal.Intecap),
             ("Total cuota patronal", reporte.CuotaPatronal.Total)
         };
         foreach (var (concepto, monto) in cuota)
@@ -248,8 +246,6 @@ public class GeneradorDocumentos : IGeneradorDocumentos
             });
             tabla.Cell().ColumnSpan(2).BorderBottom(1).Padding(2).Text("CUOTA PATRONAL").Bold();
             LineaMonto(tabla, "IGSS patronal", cuota.IgssPatronal);
-            LineaMonto(tabla, "IRTRA", cuota.Irtra);
-            LineaMonto(tabla, "INTECAP", cuota.Intecap);
             tabla.Cell().BorderTop(0.8f).Padding(2).Text("Total").Bold();
             tabla.Cell().BorderTop(0.8f).Padding(2).AlignRight().Text(Monto(cuota.Total)).Bold();
         });
@@ -342,6 +338,7 @@ public class GeneradorDocumentos : IGeneradorDocumentos
             fila.RelativeItem().AlignRight().Column(c =>
             {
                 c.Item().AlignRight().Text(titulo).Bold().FontSize(11);
+                c.Item().AlignRight().Text($"{encabezado.Codigo} - {encabezado.Descripcion}");
                 c.Item().AlignRight().Text($"Periodo: {Periodo(encabezado)} ({encabezado.FechaInicio:dd/MM/yyyy} al {encabezado.FechaFin:dd/MM/yyyy})");
                 var estado = c.Item().AlignRight().Text(Estado(encabezado));
                 if (encabezado.Preliminar)

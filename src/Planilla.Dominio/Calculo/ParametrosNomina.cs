@@ -4,8 +4,6 @@ public class ParametrosNomina
 {
     public decimal IgssLaboral { get; set; }
     public decimal IgssPatronal { get; set; }
-    public decimal Irtra { get; set; }
-    public decimal Intecap { get; set; }
     public decimal BonificacionIncentivo { get; set; }
     public decimal FactorHoraExtra { get; set; }
     public int DiasMes { get; set; }

@@ -4,14 +4,21 @@ namespace Planilla.Aplicacion.Interfaces;
 
 public interface INominaServicio
 {
-    Task<List<NominaDto>> ObtenerTodas(int? anio);
+    Task<List<TipoPlanillaDto>> ObtenerTiposPlanilla(bool soloActivos);
+    Task<List<NominaDto>> ObtenerTodas(int? anio, int? idTipoPlanilla);
     Task<NominaDto> ObtenerPorId(int idNomina);
     Task<NominaDto> Crear(NominaCrearDto dto);
+    Task<NominaDto> Editar(int idNomina, NominaEditarDto dto);
     Task Eliminar(int idNomina);
-    Task<List<EmpleadoMesDto>> ObtenerEmpleados(int idNomina);
-    Task<List<NominaDetalleDto>> ObtenerDetalle(int idNomina);
-    Task<ComparacionDto> ObtenerComparacion(int idNomina);
-    Task<NominaDto> Calcular(int idNomina, CalcularDto dto);
+    Task<NominaDto> Preparar(int idNomina);
+    Task<List<NominaEmpleadoDto>> ObtenerEmpleados(int idNomina);
+    Task<NominaEmpleadoDto> GuardarDatosEmpleado(int idNomina, int idEmpleado, DatosEmpleadoGuardarDto dto);
+    Task<List<NominaEmpleadoDto>> GuardarVariable(int idNomina, VariableGuardarDto dto);
+    Task<List<NominaEmpleadoDto>> GuardarVariables(int idNomina, ImportarVariablesDto dto);
+    Task<NominaDto> Generar(int idNomina);
+    Task<NominaDto> VolverAPreparada(int idNomina);
+    Task<List<ResumenRubroDto>> ObtenerResumenRubros(int idNomina);
     Task<NominaDto> Cerrar(int idNomina, CerrarDto dto);
     Task<NominaDto> Reabrir(int idNomina, ReabrirDto dto);
+    Task<List<PagoEmpleadoDto>> ObtenerPagosEmpleado(int idEmpleado);
 }

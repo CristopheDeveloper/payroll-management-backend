@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -100,10 +100,7 @@ public partial class Empleado
     public virtual Puesto IdPuestoNavigation { get; set; }
 
     [InverseProperty("IdEmpleadoNavigation")]
-    public virtual ICollection<MovimientoNomina> MovimientoNomina { get; set; } = new List<MovimientoNomina>();
-
-    [InverseProperty("IdEmpleadoNavigation")]
-    public virtual ICollection<NominaDetalle> NominaDetalle { get; set; } = new List<NominaDetalle>();
+    public virtual ICollection<NominaEmpleado> NominaEmpleado { get; set; } = new List<NominaEmpleado>();
 
     [InverseProperty("IdEmpleadoNavigation")]
     public virtual ICollection<PeriodoLaboral> PeriodoLaboral { get; set; } = new List<PeriodoLaboral>();

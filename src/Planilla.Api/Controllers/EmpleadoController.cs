@@ -12,10 +12,12 @@ namespace Planilla.Api.Controllers;
 public class EmpleadoController : ControllerBase
 {
     private readonly IEmpleadoServicio _empleadoServicio;
+    private readonly INominaServicio _nominaServicio;
 
-    public EmpleadoController(IEmpleadoServicio empleadoServicio)
+    public EmpleadoController(IEmpleadoServicio empleadoServicio, INominaServicio nominaServicio)
     {
         _empleadoServicio = empleadoServicio;
+        _nominaServicio = nominaServicio;
     }
 
     [HttpGet]
@@ -29,6 +31,13 @@ public class EmpleadoController : ControllerBase
     public async Task<ActionResult<EmpleadoDetalleDto>> ObtenerPorId(int id)
     {
         return await _empleadoServicio.ObtenerPorId(id);
+    }
+
+    [HttpGet("{id:int}/pagos")]
+    public async Task<ActionResult<List<PagoEmpleadoDto>>> ObtenerPagos(int id)
+    {
+        await _empleadoServicio.ObtenerPorId(id);
+        return await _nominaServicio.ObtenerPagosEmpleado(id);
     }
 
     [HttpPost]

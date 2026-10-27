@@ -1,16 +1,10 @@
-using System.Globalization;
+using Planilla.Dominio.Constantes;
 using Planilla.Dominio.Entidades;
 
 namespace Planilla.Dominio.Calculo;
 
 public static class CalculoNomina
 {
-    public const string CampoSalario = "Salario";
-    public const string CampoRetencionIsr = "RetencionIsr";
-    public const string CampoIdPuesto = "IdPuesto";
-    public const string CampoIdDepartamento = "IdDepartamento";
-    public const string CampoTipoPago = "TipoPago";
-
     public static decimal Redondear(decimal valor)
     {
         return Math.Round(valor, 2, MidpointRounding.AwayFromZero);
@@ -66,77 +60,65 @@ public static class CalculoNomina
         return baseIgss == 0 ? 0 : retencionIsr;
     }
 
-    public static void ActualizarFila(NominaDetalle fila, DatosEmpleadoMes datos, ISet<string> camposConValorActual,
-        bool esNueva, ParametrosNomina parametros)
+    public static List<RubroCalculado> GenerarRubros(DatosEmpleadoMes datos, ParametrosNomina p)
     {
-        if (esNueva || camposConValorActual.Contains(CampoSalario))
+        var rubros = new List<RubroCalculado>();
+
+        var salario = Redondear(datos.Salario * datos.DiasPagar / p.DiasMes);
+        rubros.Add(Sistema(CodigosRubro.SalarioOrdinario, "INGRESO", null, salario));
+
+        var horasExtra = Redondear(datos.Salario * p.FactorHoraExtra * datos.HorasExtra / p.HorasMes);
+        if (datos.HorasExtra > 0)
         {
-            fila.Salario = datos.Salario;
-        }
-        if (esNueva || camposConValorActual.Contains(CampoRetencionIsr))
-        {
-            fila.RetencionIsr = datos.RetencionIsr;
-        }
-        if (esNueva || camposConValorActual.Contains(CampoIdPuesto))
-        {
-            fila.IdPuesto = datos.IdPuesto;
-        }
-        if (esNueva || camposConValorActual.Contains(CampoIdDepartamento))
-        {
-            fila.IdDepartamento = datos.IdDepartamento;
-        }
-        if (esNueva || camposConValorActual.Contains(CampoTipoPago))
-        {
-            fila.TipoPago = datos.TipoPago;
+            rubros.Add(Sistema(CodigosRubro.HorasExtra, "INGRESO", null, horasExtra));
         }
 
-        fila.DiasPeriodo = datos.DiasPeriodo;
-        fila.DiasFalta = datos.DiasFalta;
-        fila.DiasSuspension = datos.DiasSuspension;
-        fila.DiasPagar = datos.DiasPagar;
-        fila.HorasExtra = datos.HorasExtra;
-        fila.OtrosIngresosAfectos = datos.OtrosIngresosAfectos;
-        fila.OtrosIngresosNoAfectos = datos.OtrosIngresosNoAfectos;
-        fila.OtrosDescuentos = datos.OtrosDescuentos;
+        rubros.Add(Sistema(CodigosRubro.BonificacionIncentivo, "INGRESO", null,
+            Redondear(p.BonificacionIncentivo * datos.DiasPagar / p.DiasMes)));
 
-        CalcularMontos(fila, parametros);
+        var valores = datos.Valores.Where(v => v.Monto > 0).OrderBy(v => v.Orden).ToList();
+        foreach (var valor in valores.Where(v => v.Tipo == "INGRESO"))
+        {
+            rubros.Add(Manual(valor));
+        }
+
+        var baseIgss = salario + horasExtra + valores.Where(v => v.Tipo == "INGRESO" && v.AfectoIgss).Sum(v => v.Monto);
+        rubros.Add(Sistema(CodigosRubro.IgssLaboral, "DESCUENTO", baseIgss, Redondear(baseIgss * p.IgssLaboral / 100)));
+
+        var isr = IsrAplicable(datos.Isr, baseIgss);
+        if (isr > 0)
+        {
+            rubros.Add(Sistema(CodigosRubro.Isr, "DESCUENTO", null, isr));
+        }
+
+        foreach (var valor in valores.Where(v => v.Tipo == "DESCUENTO"))
+        {
+            rubros.Add(Manual(valor));
+        }
+
+        rubros.Add(Sistema(CodigosRubro.IgssPatronal, "PATRONAL", baseIgss, Redondear(baseIgss * p.IgssPatronal / 100)));
+
+        return rubros;
     }
 
-    public static void CalcularMontos(NominaDetalle fila, ParametrosNomina p)
+    public static decimal Total(IEnumerable<RubroCalculado> rubros, string tipo)
     {
-        fila.SalarioDevengado = Redondear(fila.Salario * fila.DiasPagar / p.DiasMes);
-        fila.MontoHorasExtra = Redondear(fila.Salario * p.FactorHoraExtra * fila.HorasExtra / p.HorasMes);
-        fila.Bonificacion = Redondear(p.BonificacionIncentivo * fila.DiasPagar / p.DiasMes);
-        fila.TotalIngresos = fila.SalarioDevengado + fila.MontoHorasExtra + fila.Bonificacion
-            + fila.OtrosIngresosAfectos + fila.OtrosIngresosNoAfectos;
-
-        var baseIgss = fila.SalarioDevengado + fila.MontoHorasExtra + fila.OtrosIngresosAfectos;
-        fila.IgssLaboral = Redondear(baseIgss * p.IgssLaboral / 100);
-        fila.Isr = IsrAplicable(fila.RetencionIsr, baseIgss);
-        fila.TotalDescuentos = fila.IgssLaboral + fila.Isr + fila.OtrosDescuentos;
-        fila.LiquidoRecibir = fila.TotalIngresos - fila.TotalDescuentos;
-
-        fila.IgssPatronal = Redondear(baseIgss * p.IgssPatronal / 100);
-        fila.Irtra = Redondear(baseIgss * p.Irtra / 100);
-        fila.Intecap = Redondear(baseIgss * p.Intecap / 100);
+        return rubros.Where(r => r.Tipo == tipo).Sum(r => r.Monto);
     }
 
-    public static string Firma(NominaDetalle fila)
+    private static RubroCalculado Sistema(string codigo, string tipo, decimal? baseCalculo, decimal monto)
     {
-        var montos = new[]
-        {
-            fila.Salario, fila.RetencionIsr, fila.Isr, fila.HorasExtra, fila.SalarioDevengado, fila.MontoHorasExtra,
-            fila.Bonificacion, fila.OtrosIngresosAfectos, fila.OtrosIngresosNoAfectos, fila.TotalIngresos,
-            fila.IgssLaboral, fila.OtrosDescuentos, fila.TotalDescuentos, fila.LiquidoRecibir, fila.IgssPatronal,
-            fila.Irtra, fila.Intecap
-        };
-        var enteros = new[]
-        {
-            fila.IdPuesto, fila.IdDepartamento, fila.DiasPeriodo, fila.DiasFalta, fila.DiasSuspension, fila.DiasPagar
-        };
+        return new RubroCalculado { Codigo = codigo, Tipo = tipo, Base = baseCalculo, Monto = monto };
+    }
 
-        return string.Join("|", montos.Select(m => m.ToString("0.00", CultureInfo.InvariantCulture)))
-            + "|" + string.Join("|", enteros)
-            + "|" + fila.TipoPago;
+    private static RubroCalculado Manual(ValorManual valor)
+    {
+        return new RubroCalculado
+        {
+            IdRubro = valor.IdRubro,
+            Tipo = valor.Tipo,
+            Monto = valor.Monto,
+            Descripcion = valor.Descripcion
+        };
     }
 }

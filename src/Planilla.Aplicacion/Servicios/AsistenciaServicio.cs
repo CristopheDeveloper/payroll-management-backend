@@ -147,7 +147,6 @@ public class AsistenciaServicio : IAsistenciaServicio
                 NombreCompleto = $"{e.Nombres} {e.Apellidos}",
                 Faltas = total?.Faltas ?? 0,
                 Permisos = total?.Permisos ?? 0,
-                Vacaciones = total?.Vacaciones ?? 0,
                 SuspensionIgss = total?.SuspensionIgss ?? 0,
                 HorasExtra = total?.HorasExtra ?? 0
             };
@@ -240,27 +239,6 @@ public class AsistenciaServicio : IAsistenciaServicio
 
         var guardadas = await _asistenciaRepositorio.ObtenerPorEmpleado(dto.IdEmpleado, desde, hasta);
         return guardadas.Select(ADto).ToList();
-    }
-
-    public async Task<VacacionesAnioDto> ObtenerVacaciones(int idEmpleado, int? anio)
-    {
-        ValidarAnio(anio);
-
-        if (await _empleadoRepositorio.ObtenerPorId(idEmpleado) == null)
-        {
-            throw new ReglaNegocioException("El empleado no existe.", 404);
-        }
-
-        var fechas = await _asistenciaRepositorio.ObtenerFechasPorEstado(idEmpleado, "VACACIONES",
-            new DateOnly(anio.Value, 1, 1), new DateOnly(anio.Value, 12, 31));
-        var hoy = Hoy();
-
-        return new VacacionesAnioDto
-        {
-            Anio = anio.Value,
-            DiasTomados = fechas.Count(f => f <= hoy),
-            DiasProgramados = fechas.Count(f => f > hoy)
-        };
     }
 
     public async Task Eliminar(int idAsistencia)

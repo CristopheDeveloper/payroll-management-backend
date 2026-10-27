@@ -48,12 +48,6 @@ public class AsistenciaController : ControllerBase
         return await _asistenciaServicio.RegistrarRango(dto);
     }
 
-    [HttpGet("empleado/{idEmpleado:int}/vacaciones")]
-    public async Task<ActionResult<VacacionesAnioDto>> ObtenerVacaciones(int idEmpleado, int? anio = null)
-    {
-        return await _asistenciaServicio.ObtenerVacaciones(idEmpleado, anio);
-    }
-
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Eliminar(int id)
     {

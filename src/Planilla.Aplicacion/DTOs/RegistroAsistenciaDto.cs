@@ -8,7 +8,7 @@ public class RegistroAsistenciaDto
     public int IdEmpleado { get; set; }
 
     [Required(ErrorMessage = "El estado es obligatorio.")]
-    [AllowedValues("PRESENTE", "FALTA", "PERMISO", "VACACIONES", "SUSPENSION_IGSS", ErrorMessage = "El estado debe ser PRESENTE, FALTA, PERMISO, VACACIONES o SUSPENSION_IGSS.")]
+    [AllowedValues("PRESENTE", "FALTA", "PERMISO", "SUSPENSION_IGSS", ErrorMessage = "El estado debe ser PRESENTE, FALTA, PERMISO o SUSPENSION_IGSS.")]
     public string Estado { get; set; }
 
     [Range(typeof(decimal), "0", "999.99", ParseLimitsInInvariantCulture = true, ErrorMessage = "Las horas extra deben estar entre 0 y 999.99.")]
