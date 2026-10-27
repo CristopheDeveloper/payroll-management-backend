@@ -3,6 +3,7 @@ using Planilla.Aplicacion.DTOs;
 using Planilla.Aplicacion.Excepciones;
 using Planilla.Aplicacion.Interfaces;
 using Planilla.Dominio.Entidades;
+using Planilla.Dominio.Tiempo;
 
 namespace Planilla.Aplicacion.Servicios;
 
@@ -349,7 +350,7 @@ public class EmpleadoServicio : IEmpleadoServicio
 
     private static DateOnly Hoy()
     {
-        return DateOnly.FromDateTime(DateTime.Today);
+        return RelojGuatemala.Hoy;
     }
 
     private static PeriodoLaboral UltimoPeriodo(Empleado empleado)

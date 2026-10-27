@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Planilla.Aplicacion.Interfaces;
 using Planilla.Dominio.Entidades;
+using Planilla.Dominio.Tiempo;
 
 namespace Planilla.Infraestructura.AccesoDatos.Repositorios;
 
@@ -77,8 +78,9 @@ public class UsuarioRepositorio : IUsuarioRepositorio
 
     public async Task ActualizarUltimoAcceso(int idUsuario)
     {
+        var ahora = RelojGuatemala.Ahora;
         await _context.Usuario
             .Where(u => u.IdUsuario == idUsuario)
-            .ExecuteUpdateAsync(s => s.SetProperty(u => u.UltimoAcceso, DateTime.Now));
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.UltimoAcceso, ahora));
     }
 }

@@ -5,6 +5,7 @@ using Planilla.Aplicacion.Interfaces;
 using Planilla.Dominio.Calculo;
 using Planilla.Dominio.Constantes;
 using Planilla.Dominio.Entidades;
+using Planilla.Dominio.Tiempo;
 
 namespace Planilla.Aplicacion.Servicios;
 
@@ -241,7 +242,7 @@ public class NominaServicio : INominaServicio
 
         GuardarParametros(nomina, parametros);
         nomina.Estado = "PREPARADA";
-        nomina.FechaPreparacion = DateTime.Now;
+        nomina.FechaPreparacion = RelojGuatemala.Ahora;
         nomina.FechaGeneracion = null;
         LimpiarTotales(nomina);
         await _unidadTrabajo.GuardarCambiosAsync();
@@ -467,7 +468,7 @@ public class NominaServicio : INominaServicio
         nomina.TotalLiquido = filas.Sum(f => f.Liquido);
         nomina.TotalPatronal = filas.Sum(f => f.TotalPatronal);
         nomina.Estado = "GENERADA";
-        nomina.FechaGeneracion = DateTime.Now;
+        nomina.FechaGeneracion = RelojGuatemala.Ahora;
         await _unidadTrabajo.GuardarCambiosAsync();
 
         return await ObtenerPorId(idNomina);
@@ -560,7 +561,7 @@ public class NominaServicio : INominaServicio
 
         nomina.Estado = "CERRADA";
         nomina.UsuarioCierre = _usuarioActual.NombreUsuario;
-        nomina.FechaCierre = DateTime.Now;
+        nomina.FechaCierre = RelojGuatemala.Ahora;
         await _unidadTrabajo.GuardarCambiosAsync();
 
         return await ObtenerPorId(idNomina);
@@ -894,7 +895,7 @@ public class NominaServicio : INominaServicio
 
     private static DateOnly Hoy()
     {
-        return DateOnly.FromDateTime(DateTime.Today);
+        return RelojGuatemala.Hoy;
     }
 
     private static NominaDto ADto(Nomina nomina, int cantidadEmpleados, List<AdvertenciaDto> advertencias)
