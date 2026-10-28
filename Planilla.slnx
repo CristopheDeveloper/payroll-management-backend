@@ -17,6 +17,7 @@
     <File Path="database/11_Nomina.sql" />
     <File Path="database/12_MovimientoNomina.sql" />
     <File Path="database/13_NominaDetalle.sql" />
+    <File Path="database/16_EmpleadoFoto.sql" />
   </Folder>
   <Folder Name="/Elementos de la solución/">
     <File Path=".dockerignore" />

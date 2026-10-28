@@ -12,6 +12,7 @@ using Planilla.Aplicacion.Interfaces;
 using Planilla.Aplicacion.Servicios;
 using Planilla.Infraestructura.AccesoDatos;
 using Planilla.Infraestructura.AccesoDatos.Repositorios;
+using Planilla.Infraestructura.Archivos;
 using Planilla.Infraestructura.Reportes;
 using Planilla.Infraestructura.Seguridad;
 using QuestPDF.Infrastructure;
@@ -41,11 +42,15 @@ builder.Services.AddScoped<IDepartamentoServicio, DepartamentoServicio>();
 builder.Services.AddScoped<IPuestoServicio, PuestoServicio>();
 builder.Services.AddScoped<IParametroServicio, ParametroServicio>();
 builder.Services.AddScoped<IEmpleadoServicio, EmpleadoServicio>();
+builder.Services.AddScoped<IFotoEmpleadoServicio, FotoEmpleadoServicio>();
 builder.Services.AddScoped<IAsistenciaServicio, AsistenciaServicio>();
 builder.Services.AddScoped<IRubroServicio, RubroServicio>();
 builder.Services.AddScoped<INominaServicio, NominaServicio>();
 builder.Services.AddScoped<IReporteServicio, ReporteServicio>();
 builder.Services.AddScoped<IReporteCatalogoServicio, ReporteCatalogoServicio>();
+builder.Services.Configure<SftpFotoEmpleadoOpciones>(
+    builder.Configuration.GetSection(SftpFotoEmpleadoOpciones.Seccion));
+builder.Services.AddSingleton<IAlmacenFotoEmpleado, SftpAlmacenFotoEmpleado>();
 
 QuestPDF.Settings.License = LicenseType.Community;
 QuestPDF.Settings.ThrowOnMissingTextGlyphs = false;

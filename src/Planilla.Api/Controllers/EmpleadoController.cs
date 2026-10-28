@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Planilla.Aplicacion.DTOs;
 using Planilla.Aplicacion.Interfaces;
+using Planilla.Aplicacion.Servicios;
 using Planilla.Dominio.Constantes;
 
 namespace Planilla.Api.Controllers;
@@ -12,11 +13,14 @@ namespace Planilla.Api.Controllers;
 public class EmpleadoController : ControllerBase
 {
     private readonly IEmpleadoServicio _empleadoServicio;
+    private readonly IFotoEmpleadoServicio _fotoEmpleadoServicio;
     private readonly INominaServicio _nominaServicio;
 
-    public EmpleadoController(IEmpleadoServicio empleadoServicio, INominaServicio nominaServicio)
+    public EmpleadoController(IEmpleadoServicio empleadoServicio, IFotoEmpleadoServicio fotoEmpleadoServicio,
+        INominaServicio nominaServicio)
     {
         _empleadoServicio = empleadoServicio;
+        _fotoEmpleadoServicio = fotoEmpleadoServicio;
         _nominaServicio = nominaServicio;
     }
 
@@ -51,6 +55,37 @@ public class EmpleadoController : ControllerBase
     public async Task<ActionResult<EmpleadoDetalleDto>> Editar(int id, EmpleadoEditarDto dto)
     {
         return await _empleadoServicio.Editar(id, dto);
+    }
+
+    [HttpPost("{id:int}/foto")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(FotoEmpleadoServicio.TamanoMaximo + 512 * 1024)]
+    public async Task<ActionResult<EmpleadoFotoDto>> GuardarFoto(int id, [FromForm] IFormFile foto,
+        CancellationToken cancellationToken)
+    {
+        if (foto == null)
+            return BadRequest(new ProblemDetails { Title = "Selecciona una fotografía." });
+
+        await using var contenido = foto.OpenReadStream();
+        return await _fotoEmpleadoServicio.Guardar(id, contenido, foto.FileName, foto.ContentType,
+            foto.Length, cancellationToken);
+    }
+
+    [HttpGet("{id:int}/foto/contenido")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ObtenerFoto(int id, CancellationToken cancellationToken)
+    {
+        var foto = await _fotoEmpleadoServicio.Obtener(id, cancellationToken);
+        return File(foto.Contenido, foto.TipoContenido, enableRangeProcessing: true);
+    }
+
+    [HttpDelete("{id:int}/foto")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> EliminarFoto(int id, CancellationToken cancellationToken)
+    {
+        await _fotoEmpleadoServicio.Eliminar(id, cancellationToken);
+        return NoContent();
     }
 
     [HttpPost("{id:int}/baja")]

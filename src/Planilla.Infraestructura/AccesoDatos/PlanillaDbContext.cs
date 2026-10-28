@@ -20,6 +20,8 @@ public partial class PlanillaDbContext : DbContext
 
     public virtual DbSet<Empleado> Empleado { get; set; }
 
+    public virtual DbSet<EmpleadoFoto> EmpleadoFoto { get; set; }
+
     public virtual DbSet<Nomina> Nomina { get; set; }
 
     public virtual DbSet<NominaEmpleado> NominaEmpleado { get; set; }
@@ -81,6 +83,15 @@ public partial class PlanillaDbContext : DbContext
             entity.HasOne(d => d.IdPuestoNavigation).WithMany(p => p.Empleado)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_Empleado_Puesto");
+        });
+
+        modelBuilder.Entity<EmpleadoFoto>(entity =>
+        {
+            entity.Property(e => e.FechaIng).HasDefaultValueSql("(sysdatetime())", "DF_EmpleadoFoto_FechaIng");
+            entity.HasOne(d => d.Empleado).WithOne(p => p.Foto)
+                .HasForeignKey<EmpleadoFoto>(d => d.IdEmpleado)
+                .OnDelete(DeleteBehavior.NoAction)
+                .HasConstraintName("FK_EmpleadoFoto_Empleado");
         });
 
         modelBuilder.Entity<Nomina>(entity =>
