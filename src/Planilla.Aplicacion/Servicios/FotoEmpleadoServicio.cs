@@ -46,7 +46,7 @@ public class FotoEmpleadoServicio : IFotoEmpleadoServicio
                 _empleadoRepositorio.AgregarFoto(anterior);
             }
 
-            anterior.Url = $"/api/Empleado/{idEmpleado}/foto/contenido?v={Guid.NewGuid():N}";
+            anterior.Url = $"/Empleado/{idEmpleado}/foto/contenido?v={Guid.NewGuid():N}";
             anterior.RutaSftp = guardado.RutaSftp;
             anterior.NombreArchivo = guardado.NombreArchivo;
             anterior.TipoContenido = tipoReal;
