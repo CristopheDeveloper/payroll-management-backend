@@ -375,6 +375,7 @@ public class EmpleadoServicio : IEmpleadoServicio
             TipoPago = empleado.TipoPago,
             Salario = empleado.Salario,
             Activo = empleado.Activo,
+            FotoUrl = empleado.Foto?.Url,
             FechaIngresoActual = ultimo?.FechaIngreso,
             FechaBajaUltima = ultimo?.FechaBaja
         };
@@ -407,6 +408,7 @@ public class EmpleadoServicio : IEmpleadoServicio
             Salario = empleado.Salario,
             RetencionIsr = empleado.RetencionIsr,
             Activo = empleado.Activo,
+            FotoUrl = empleado.Foto?.Url,
             Periodos = empleado.PeriodoLaboral
                 .OrderByDescending(p => p.FechaIngreso)
                 .ThenByDescending(p => p.IdPeriodoLaboral)

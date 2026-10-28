@@ -11,6 +11,7 @@ public class EmpleadoDto
     public string TipoPago { get; set; }
     public decimal Salario { get; set; }
     public bool Activo { get; set; }
+    public string FotoUrl { get; set; }
     public DateOnly? FechaIngresoActual { get; set; }
     public DateOnly? FechaBajaUltima { get; set; }
 }

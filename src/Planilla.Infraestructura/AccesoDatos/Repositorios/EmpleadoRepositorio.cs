@@ -20,6 +20,7 @@ public class EmpleadoRepositorio : IEmpleadoRepositorio
             .Include(e => e.IdPuestoNavigation)
             .Include(e => e.IdDepartamentoNavigation)
             .Include(e => e.PeriodoLaboral)
+            .Include(e => e.Foto)
             .AsQueryable();
 
         if (activo.HasValue)
@@ -58,6 +59,7 @@ public class EmpleadoRepositorio : IEmpleadoRepositorio
             .Include(e => e.IdPuestoNavigation)
             .Include(e => e.IdDepartamentoNavigation)
             .Include(e => e.PeriodoLaboral)
+            .Include(e => e.Foto)
             .FirstOrDefaultAsync(e => e.IdEmpleado == idEmpleado);
     }
 
@@ -71,6 +73,11 @@ public class EmpleadoRepositorio : IEmpleadoRepositorio
         return await _context.Empleado
             .AsNoTracking()
             .FirstOrDefaultAsync(e => e.Dpi == dpi && e.IdEmpleado != idExcluir);
+    }
+
+    public async Task<EmpleadoFoto> ObtenerFotoParaModificar(int idEmpleado)
+    {
+        return await _context.EmpleadoFoto.FirstOrDefaultAsync(f => f.IdEmpleado == idEmpleado);
     }
 
     public async Task<List<PeriodoLaboral>> ObtenerPeriodosParaModificar(int idEmpleado)
@@ -100,5 +107,15 @@ public class EmpleadoRepositorio : IEmpleadoRepositorio
     public void AgregarPeriodo(PeriodoLaboral periodo)
     {
         _context.PeriodoLaboral.Add(periodo);
+    }
+
+    public void AgregarFoto(EmpleadoFoto foto)
+    {
+        _context.EmpleadoFoto.Add(foto);
+    }
+
+    public void EliminarFoto(EmpleadoFoto foto)
+    {
+        _context.EmpleadoFoto.Remove(foto);
     }
 }
