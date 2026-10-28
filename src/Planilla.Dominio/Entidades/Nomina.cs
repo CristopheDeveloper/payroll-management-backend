@@ -62,9 +62,6 @@ public partial class Nomina
     [Column(TypeName = "decimal(9, 4)")]
     public decimal? IgssPatronal { get; set; }
 
-    [Column(TypeName = "decimal(10, 2)")]
-    public decimal? BonificacionIncentivo { get; set; }
-
     [Column(TypeName = "decimal(9, 4)")]
     public decimal? FactorHoraExtra { get; set; }
 

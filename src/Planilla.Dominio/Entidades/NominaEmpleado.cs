@@ -26,6 +26,9 @@ public partial class NominaEmpleado
     [Column(TypeName = "decimal(10, 2)")]
     public decimal RetencionIsr { get; set; }
 
+    [Column(TypeName = "decimal(10, 2)")]
+    public decimal BonificacionIncentivo { get; set; }
+
     [Required]
     [StringLength(15)]
     public string TipoPago { get; set; }

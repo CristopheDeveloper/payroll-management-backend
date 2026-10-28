@@ -170,6 +170,7 @@ public partial class PlanillaDbContext : DbContext
         modelBuilder.Entity<Rubro>(entity =>
         {
             entity.Property(e => e.Activo).HasDefaultValue(true, "DF_Rubro_Activo");
+            entity.Property(e => e.CuentaContable).IsFixedLength();
             entity.Property(e => e.FechaIng).HasDefaultValueSql("(sysdatetime())", "DF_Rubro_FechaIng");
             entity.Property(e => e.Origen).HasDefaultValue("MANUAL", "DF_Rubro_Origen");
         });

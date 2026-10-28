@@ -8,7 +8,7 @@ public class RangoAsistenciaDto
     public int IdEmpleado { get; set; }
 
     [Required(ErrorMessage = "El estado es obligatorio.")]
-    [AllowedValues("PERMISO", "SUSPENSION_IGSS", ErrorMessage = "El estado debe ser PERMISO o SUSPENSION_IGSS.")]
+    [AllowedValues("FALTA", "PERMISO", "SUSPENSION_IGSS", ErrorMessage = "El estado debe ser FALTA, PERMISO o SUSPENSION_IGSS.")]
     public string Estado { get; set; }
 
     [Required(ErrorMessage = "La fecha inicial es obligatoria.")]

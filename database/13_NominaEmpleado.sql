@@ -10,6 +10,7 @@ CREATE TABLE NominaEmpleado (
     IdDepartamento      INT               NOT NULL,
     Salario             DECIMAL(10,2)     NOT NULL,
     RetencionIsr        DECIMAL(10,2)     NOT NULL,
+    BonificacionIncentivo DECIMAL(10,2)   NOT NULL,
     TipoPago            NVARCHAR(15)      NOT NULL,
     Banco               NVARCHAR(50)      NULL,
     CuentaBancaria      NVARCHAR(30)      NULL,
@@ -37,7 +38,7 @@ CREATE TABLE NominaEmpleado (
     CONSTRAINT FK_NominaEmpleado_Puesto FOREIGN KEY (IdPuesto) REFERENCES Puesto (IdPuesto),
     CONSTRAINT FK_NominaEmpleado_Departamento FOREIGN KEY (IdDepartamento) REFERENCES Departamento (IdDepartamento),
     CONSTRAINT CK_NominaEmpleado_TipoPago CHECK (TipoPago IN ('EFECTIVO', 'CHEQUE', 'TRANSFERENCIA')),
-    CONSTRAINT CK_NominaEmpleado_Montos CHECK (Salario > 0 AND RetencionIsr >= 0 AND Isr >= 0),
+    CONSTRAINT CK_NominaEmpleado_Montos CHECK (Salario > 0 AND RetencionIsr >= 0 AND BonificacionIncentivo >= 0 AND Isr >= 0),
     CONSTRAINT CK_NominaEmpleado_DiasPeriodo CHECK (DiasPeriodo BETWEEN 0 AND 366),
     CONSTRAINT CK_NominaEmpleado_Dias CHECK (
         DiasFalta >= 0 AND DiasSuspension >= 0

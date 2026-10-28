@@ -77,19 +77,26 @@ public class RubroServicio : IRubroServicio
 
     public async Task<RubroDto> Editar(int idRubro, RubroEditarDto dto)
     {
-        var rubro = await ObtenerManualParaModificar(idRubro);
+        var rubro = await _rubroRepositorio.ObtenerParaModificar(idRubro)
+            ?? throw new ReglaNegocioException("El rubro no existe.", 404);
+        if (rubro.Origen == "SISTEMA")
+        {
+            rubro.CuentaContable = Texto(dto.CuentaContable);
+            await _unidadTrabajo.GuardarCambiosAsync();
+            return ADto(rubro);
+        }
+
         var nombre = dto.Nombre.Trim();
         if (await _rubroRepositorio.ExisteNombre(nombre, idRubro))
         {
             throw new ReglaNegocioException($"Ya existe un rubro con el nombre '{nombre}'.", 409);
         }
-        if (rubro.Tipo == "DESCUENTO" && dto.AfectoIgss)
+        if (dto.AfectoIgss != rubro.AfectoIgss)
         {
-            throw new ReglaNegocioException("Solo un rubro de ingreso puede ser afecto al IGSS.");
+            throw new ReglaNegocioException("El afecto al IGSS se define al crear el rubro y no se cambia.");
         }
 
         rubro.Nombre = nombre;
-        rubro.AfectoIgss = dto.AfectoIgss;
         rubro.Orden = dto.Orden;
         rubro.Descripcion = Texto(dto.Descripcion);
         rubro.CuentaContable = Texto(dto.CuentaContable);

@@ -301,6 +301,7 @@ public class EmpleadoServicio : IEmpleadoServicio
 
         ValidarDosDecimales(dto.Salario, "El salario");
         ValidarDosDecimales(dto.RetencionIsr, "La retención de ISR");
+        ValidarDosDecimales(dto.BonificacionIncentivo.Value, "La bonificación incentivo");
         if (dto.RetencionIsr >= dto.Salario)
         {
             throw new ReglaNegocioException("La retención de ISR debe ser menor al salario.");
@@ -341,6 +342,7 @@ public class EmpleadoServicio : IEmpleadoServicio
         empleado.IdDepartamento = dto.IdDepartamento;
         empleado.Salario = dto.Salario;
         empleado.RetencionIsr = dto.RetencionIsr;
+        empleado.BonificacionIncentivo = dto.BonificacionIncentivo.Value;
     }
 
     private static string Limpiar(string texto)
@@ -406,6 +408,7 @@ public class EmpleadoServicio : IEmpleadoServicio
             NombreDepartamento = empleado.IdDepartamentoNavigation.Nombre,
             Salario = empleado.Salario,
             RetencionIsr = empleado.RetencionIsr,
+            BonificacionIncentivo = empleado.BonificacionIncentivo,
             Activo = empleado.Activo,
             Periodos = empleado.PeriodoLaboral
                 .OrderByDescending(p => p.FechaIngreso)

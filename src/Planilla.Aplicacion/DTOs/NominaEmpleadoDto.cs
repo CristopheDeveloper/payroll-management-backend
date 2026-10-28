@@ -12,6 +12,7 @@ public class NominaEmpleadoDto
     public string NombreDepartamento { get; set; }
     public decimal Salario { get; set; }
     public decimal RetencionIsr { get; set; }
+    public decimal BonificacionIncentivo { get; set; }
     public string TipoPago { get; set; }
     public string Banco { get; set; }
     public string CuentaBancaria { get; set; }

@@ -24,6 +24,7 @@ public class EmpleadoDetalleDto
     public string NombreDepartamento { get; set; }
     public decimal Salario { get; set; }
     public decimal RetencionIsr { get; set; }
+    public decimal BonificacionIncentivo { get; set; }
     public bool Activo { get; set; }
     public List<PeriodoLaboralDto> Periodos { get; set; }
 }

@@ -24,5 +24,7 @@ INSERT INTO Parametro (Clave, Valor, TipoDato, Descripcion, UsuarioIng) VALUES
     ('HORAS_MES',              '240',                          'ENTERO',  N'Horas base del mes para calcular el valor de la hora', 'SISTEMA'),
     ('NOMBRE_EMPRESA',         N'Distribuidora La Ceiba, S.A.', 'TEXTO',   N'Nombre de la empresa en boletas y reportes', 'SISTEMA'),
     ('NIT_EMPRESA',            '8475123-6',                    'TEXTO',   N'NIT de la empresa', 'SISTEMA'),
-    ('DIRECCION_EMPRESA',      N'Cuilapa, Santa Rosa',          'TEXTO',   N'Dirección de la empresa', 'SISTEMA');
+    ('DIRECCION_EMPRESA',      N'Cuilapa, Santa Rosa',          'TEXTO',   N'Dirección de la empresa', 'SISTEMA'),
+    ('CUENTA_SUELDOS_POR_PAGAR',       '2101', 'TEXTO', N'Cuenta contable del líquido a pagar en la póliza de planilla', 'SISTEMA'),
+    ('CUENTA_IGSS_PATRONAL_POR_PAGAR', '2103', 'TEXTO', N'Cuenta contable de la cuota patronal del IGSS por pagar', 'SISTEMA');
 GO

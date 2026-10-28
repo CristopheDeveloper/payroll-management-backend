@@ -73,8 +73,11 @@ public static class CalculoNomina
             rubros.Add(Sistema(CodigosRubro.HorasExtra, "INGRESO", null, horasExtra));
         }
 
-        rubros.Add(Sistema(CodigosRubro.BonificacionIncentivo, "INGRESO", null,
-            Redondear(p.BonificacionIncentivo * datos.DiasPagar / p.DiasMes)));
+        if (datos.BonificacionIncentivo > 0)
+        {
+            rubros.Add(Sistema(CodigosRubro.BonificacionIncentivo, "INGRESO", null,
+                Redondear(datos.BonificacionIncentivo * datos.DiasPagar / p.DiasMes)));
+        }
 
         var valores = datos.Valores.Where(v => v.Monto > 0).OrderBy(v => v.Orden).ToList();
         foreach (var valor in valores.Where(v => v.Tipo == "INGRESO"))

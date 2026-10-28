@@ -45,6 +45,7 @@ builder.Services.AddScoped<IAsistenciaServicio, AsistenciaServicio>();
 builder.Services.AddScoped<IRubroServicio, RubroServicio>();
 builder.Services.AddScoped<INominaServicio, NominaServicio>();
 builder.Services.AddScoped<IReporteServicio, ReporteServicio>();
+builder.Services.AddScoped<IReporteCatalogoServicio, ReporteCatalogoServicio>();
 
 QuestPDF.Settings.License = LicenseType.Community;
 QuestPDF.Settings.ThrowOnMissingTextGlyphs = false;

@@ -38,7 +38,8 @@ public partial class Rubro
     [StringLength(200)]
     public string Descripcion { get; set; }
 
-    [StringLength(20)]
+    [StringLength(4)]
+    [Unicode(false)]
     public string CuentaContable { get; set; }
 
     public bool Activo { get; set; }

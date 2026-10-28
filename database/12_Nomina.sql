@@ -22,7 +22,6 @@ CREATE TABLE Nomina (
     FechaGeneracion       DATETIME2         NULL,
     IgssLaboral           DECIMAL(9,4)      NULL,
     IgssPatronal          DECIMAL(9,4)      NULL,
-    BonificacionIncentivo DECIMAL(10,2)     NULL,
     FactorHoraExtra       DECIMAL(9,4)      NULL,
     DiasMes               INT               NULL,
     HorasMes              INT               NULL,
@@ -48,7 +47,7 @@ CREATE TABLE Nomina (
         (Estado = 'CREADA' AND FechaPreparacion IS NULL)
      OR (Estado <> 'CREADA' AND FechaPreparacion IS NOT NULL
          AND IgssLaboral IS NOT NULL AND IgssPatronal IS NOT NULL
-         AND BonificacionIncentivo IS NOT NULL AND FactorHoraExtra IS NOT NULL AND DiasMes IS NOT NULL AND HorasMes IS NOT NULL)),
+         AND FactorHoraExtra IS NOT NULL AND DiasMes IS NOT NULL AND HorasMes IS NOT NULL)),
     CONSTRAINT CK_Nomina_Generacion CHECK (
         (Estado IN ('CREADA', 'PREPARADA') AND FechaGeneracion IS NULL)
      OR (Estado IN ('GENERADA', 'CERRADA') AND FechaGeneracion IS NOT NULL))

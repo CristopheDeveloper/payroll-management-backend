@@ -21,7 +21,5 @@ CREATE TABLE TipoPlanilla (
 GO
 
 INSERT INTO TipoPlanilla (Codigo, Nombre, Descripcion, IncluyeIgss, Activo, UsuarioIng) VALUES
-    ('MENSUAL',   N'Planilla mensual', N'Salario ordinario, horas extra y bonificación incentivo del mes', 1, 1, 'SISTEMA'),
-    ('BONO14',    N'Bono 14',          N'Bonificación anual, Decreto 42-92 (del 1 de julio al 30 de junio)', 0, 0, 'SISTEMA'),
-    ('AGUINALDO', N'Aguinaldo',        N'Aguinaldo, Decreto 76-78 (del 1 de diciembre al 30 de noviembre)', 0, 0, 'SISTEMA');
+    ('MENSUAL',   N'Planilla mensual', N'Salario ordinario, horas extra y bonificación incentivo del mes', 1, 1, 'SISTEMA');
 GO

@@ -16,6 +16,6 @@ public class RubroEditarDto
     [StringLength(200, ErrorMessage = "La descripción debe tener como máximo 200 caracteres.")]
     public string Descripcion { get; set; }
 
-    [StringLength(20, ErrorMessage = "La cuenta contable debe tener como máximo 20 caracteres.")]
+    [RegularExpression("^[0-9]{4}$", ErrorMessage = "La cuenta contable debe tener 4 dígitos.")]
     public string CuentaContable { get; set; }
 }
