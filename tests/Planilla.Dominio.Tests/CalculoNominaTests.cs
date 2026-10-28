@@ -1,4 +1,5 @@
 using Planilla.Dominio.Calculo;
+using Planilla.Dominio.Constantes;
 using Planilla.Dominio.Entidades;
 
 namespace Planilla.Dominio.Tests;
@@ -11,8 +12,6 @@ public class CalculoNominaTests
         {
             IgssLaboral = 4.83m,
             IgssPatronal = 10.67m,
-            Irtra = 1m,
-            Intecap = 1m,
             BonificacionIncentivo = 250m,
             FactorHoraExtra = 1.5m,
             DiasMes = diasMes,
@@ -25,108 +24,120 @@ public class CalculoNominaTests
         return new PeriodoLaboral { FechaIngreso = ingreso, FechaBaja = baja };
     }
 
-    private static DatosEmpleadoMes Datos(decimal salario, int diasPagar, decimal horasExtra = 0, decimal retencionIsr = 0,
-        decimal otrosDescuentos = 0, int diasPeriodo = 30)
+    private static DatosEmpleadoMes Datos(decimal salario, int diasPagar, decimal horasExtra = 0, decimal isr = 0)
     {
         return new DatosEmpleadoMes
         {
             Salario = salario,
-            RetencionIsr = retencionIsr,
-            IdPuesto = 1,
-            IdDepartamento = 1,
-            TipoPago = "TRANSFERENCIA",
-            DiasPeriodo = diasPeriodo,
+            Isr = isr,
             DiasPagar = diasPagar,
-            HorasExtra = horasExtra,
-            OtrosDescuentos = otrosDescuentos
+            HorasExtra = horasExtra
         };
     }
 
-    private static NominaDetalle Calcular(DatosEmpleadoMes datos, ParametrosNomina parametros = null)
+    private static ValorManual Valor(int idRubro, string tipo, decimal monto, bool afectoIgss = false, int orden = 100)
     {
-        var fila = new NominaDetalle();
-        CalculoNomina.ActualizarFila(fila, datos, new HashSet<string>(), true, parametros ?? Parametros());
-        return fila;
+        return new ValorManual { IdRubro = idRubro, Tipo = tipo, Monto = monto, AfectoIgss = afectoIgss, Orden = orden };
+    }
+
+    private static List<RubroCalculado> Calcular(DatosEmpleadoMes datos, ParametrosNomina parametros = null)
+    {
+        return CalculoNomina.GenerarRubros(datos, parametros ?? Parametros());
+    }
+
+    private static decimal Monto(List<RubroCalculado> rubros, string codigo)
+    {
+        return rubros.Where(r => r.Codigo == codigo).Sum(r => r.Monto);
+    }
+
+    private static decimal Liquido(List<RubroCalculado> rubros)
+    {
+        return CalculoNomina.Total(rubros, "INGRESO") - CalculoNomina.Total(rubros, "DESCUENTO");
     }
 
     [Fact]
     public void EjemploJuanPerez()
     {
-        var fila = Calcular(Datos(4500m, 29, horasExtra: 2, otrosDescuentos: 500m));
+        var datos = Datos(4500m, 29, horasExtra: 2);
+        datos.Valores.Add(Valor(9, "DESCUENTO", 500m, orden: 330));
 
-        Assert.Equal(4350.00m, fila.SalarioDevengado);
-        Assert.Equal(56.25m, fila.MontoHorasExtra);
-        Assert.Equal(241.67m, fila.Bonificacion);
-        Assert.Equal(4647.92m, fila.TotalIngresos);
-        Assert.Equal(212.82m, fila.IgssLaboral);
-        Assert.Equal(712.82m, fila.TotalDescuentos);
-        Assert.Equal(3935.10m, fila.LiquidoRecibir);
-        Assert.Equal(470.15m, fila.IgssPatronal);
-        Assert.Equal(44.06m, fila.Irtra);
-        Assert.Equal(44.06m, fila.Intecap);
+        var rubros = Calcular(datos);
+
+        Assert.Equal(4350.00m, Monto(rubros, CodigosRubro.SalarioOrdinario));
+        Assert.Equal(56.25m, Monto(rubros, CodigosRubro.HorasExtra));
+        Assert.Equal(241.67m, Monto(rubros, CodigosRubro.BonificacionIncentivo));
+        Assert.Equal(4647.92m, CalculoNomina.Total(rubros, "INGRESO"));
+        Assert.Equal(212.82m, Monto(rubros, CodigosRubro.IgssLaboral));
+        Assert.Equal(712.82m, CalculoNomina.Total(rubros, "DESCUENTO"));
+        Assert.Equal(3935.10m, Liquido(rubros));
+        Assert.Equal(470.15m, Monto(rubros, CodigosRubro.IgssPatronal));
+        Assert.Equal(470.15m, CalculoNomina.Total(rubros, "PATRONAL"));
     }
 
     [Fact]
     public void MultiplicaAntesDeDividir()
     {
-        var fila = Calcular(Datos(3000.25m, 3));
-
-        Assert.Equal(300.03m, fila.SalarioDevengado);
+        Assert.Equal(300.03m, Monto(Calcular(Datos(3000.25m, 3)), CodigosRubro.SalarioOrdinario));
     }
 
     [Fact]
     public void BaseIgssSinBonificacionNiIngresosNoAfectos()
     {
         var datos = Datos(4000m, 30);
-        datos.OtrosIngresosNoAfectos = 1000m;
-        datos.OtrosIngresosAfectos = 500m;
+        datos.Valores.Add(Valor(6, "INGRESO", 1000m, afectoIgss: false, orden: 150));
+        datos.Valores.Add(Valor(5, "INGRESO", 500m, afectoIgss: true, orden: 140));
 
-        var fila = Calcular(datos);
+        var rubros = Calcular(datos);
 
-        Assert.Equal(Math.Round(4500m * 4.83m / 100, 2, MidpointRounding.AwayFromZero), fila.IgssLaboral);
-        Assert.Equal(4000m + 250m + 1000m + 500m, fila.TotalIngresos);
+        Assert.Equal(Math.Round(4500m * 4.83m / 100, 2, MidpointRounding.AwayFromZero), Monto(rubros, CodigosRubro.IgssLaboral));
+        Assert.Equal(4500m, rubros.Single(r => r.Codigo == CodigosRubro.IgssLaboral).Base);
+        Assert.Equal(4000m + 250m + 1000m + 500m, CalculoNomina.Total(rubros, "INGRESO"));
     }
 
     [Fact]
     public void IsrCeroSiNoHayBaseAfecta()
     {
-        var fila = Calcular(Datos(4000m, 0, retencionIsr: 150m));
+        var rubros = Calcular(Datos(4000m, 0, isr: 150m));
 
-        Assert.Equal(150m, fila.RetencionIsr);
-        Assert.Equal(0m, fila.Isr);
-        Assert.Equal(0m, fila.LiquidoRecibir);
+        Assert.DoesNotContain(rubros, r => r.Codigo == CodigosRubro.Isr);
+        Assert.Equal(0m, Liquido(rubros));
     }
 
     [Fact]
     public void IsrCompletoConPeriodoParcial()
     {
-        var fila = Calcular(Datos(4000m, 15, retencionIsr: 150m));
-
-        Assert.Equal(150m, fila.Isr);
+        Assert.Equal(150m, Monto(Calcular(Datos(4000m, 15, isr: 150m)), CodigosRubro.Isr));
     }
 
     [Fact]
-    public void IsrVuelveAlRecalcularDesdeLaRetencionGuardada()
+    public void HorasExtraEnCeroNoGeneranRubro()
     {
-        var fila = Calcular(Datos(4000m, 0, retencionIsr: 150m));
-        Assert.Equal(0m, fila.Isr);
-
-        CalculoNomina.ActualizarFila(fila, Datos(5000m, 30, retencionIsr: 999m), new HashSet<string>(), false, Parametros());
-
-        Assert.Equal(4000m, fila.Salario);
-        Assert.Equal(150m, fila.RetencionIsr);
-        Assert.Equal(150m, fila.Isr);
+        Assert.DoesNotContain(Calcular(Datos(4000m, 30)), r => r.Codigo == CodigosRubro.HorasExtra);
     }
 
     [Fact]
-    public void ActualizarFilaConValorActual()
+    public void ValoresManualesSalenEnOrdenYConSuDescripcion()
     {
-        var fila = Calcular(Datos(4000m, 30));
+        var datos = Datos(4000m, 30);
+        datos.Valores.Add(Valor(20, "DESCUENTO", 100m, orden: 320));
+        datos.Valores.Add(Valor(10, "DESCUENTO", 50m, orden: 300));
+        datos.Valores.Add(Valor(30, "INGRESO", 200m, afectoIgss: true, orden: 100));
+        datos.Valores[0].Descripcion = "Vidrio roto";
 
-        CalculoNomina.ActualizarFila(fila, Datos(5000m, 30), new HashSet<string> { CalculoNomina.CampoSalario }, false, Parametros());
+        var rubros = Calcular(datos);
+        var manuales = rubros.Where(r => r.IdRubro != null).Select(r => r.IdRubro).ToList();
 
-        Assert.Equal(5000m, fila.Salario);
-        Assert.Equal(5000m, fila.SalarioDevengado);
+        Assert.Equal([30, 10, 20], manuales);
+        Assert.Equal("Vidrio roto", rubros.Single(r => r.IdRubro == 20).Descripcion);
+    }
+
+    [Fact]
+    public void ValorEnCeroSeIgnora()
+    {
+        var datos = Datos(4000m, 30);
+        datos.Valores.Add(Valor(10, "DESCUENTO", 0m));
+
+        Assert.DoesNotContain(Calcular(datos), r => r.IdRubro == 10);
     }
 
     [Fact]
@@ -137,7 +148,8 @@ public class CalculoNominaTests
         var diasPagar = CalculoNomina.DiasPagar(diasPeriodo, 5, CalculoNomina.DiasCalendario(tramos));
 
         Assert.Equal(25, diasPagar);
-        Assert.Equal(Math.Round(250m * 25 / 30, 2, MidpointRounding.AwayFromZero), Calcular(Datos(3000m, diasPagar)).Bonificacion);
+        Assert.Equal(Math.Round(250m * 25 / 30, 2, MidpointRounding.AwayFromZero),
+            Monto(Calcular(Datos(3000m, diasPagar)), CodigosRubro.BonificacionIncentivo));
     }
 
     [Fact]
@@ -229,28 +241,15 @@ public class CalculoNominaTests
         var diasPeriodo = CalculoNomina.DiasPeriodo(tramos, 31);
 
         Assert.Equal(31, diasPeriodo);
-        Assert.Equal(4000m, Calcular(Datos(4000m, diasPeriodo, diasPeriodo: diasPeriodo), Parametros(31)).SalarioDevengado);
+        Assert.Equal(4000m, Monto(Calcular(Datos(4000m, diasPeriodo), Parametros(31)), CodigosRubro.SalarioOrdinario));
     }
 
     [Fact]
-    public void FirmaNoCambiaSiSeRecalculaIgual()
+    public void LiquidoPuedeSerNegativoSiLosDescuentosSuperanLosIngresos()
     {
-        var fila = Calcular(Datos(4500m, 29, horasExtra: 2, otrosDescuentos: 500m));
-        var antes = CalculoNomina.Firma(fila);
+        var datos = Datos(4000m, 1);
+        datos.Valores.Add(Valor(10, "DESCUENTO", 1000m));
 
-        CalculoNomina.ActualizarFila(fila, Datos(9999m, 29, horasExtra: 2, otrosDescuentos: 500m), new HashSet<string>(), false, Parametros());
-
-        Assert.Equal(antes, CalculoNomina.Firma(fila));
-    }
-
-    [Fact]
-    public void FirmaCambiaSiCambianLasFaltas()
-    {
-        var fila = Calcular(Datos(4500m, 30));
-        var antes = CalculoNomina.Firma(fila);
-
-        CalculoNomina.ActualizarFila(fila, Datos(4500m, 29), new HashSet<string>(), false, Parametros());
-
-        Assert.NotEqual(antes, CalculoNomina.Firma(fila));
+        Assert.True(Liquido(Calcular(datos)) < 0);
     }
 }

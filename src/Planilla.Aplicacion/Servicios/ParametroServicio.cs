@@ -11,7 +11,7 @@ public class ParametroServicio : IParametroServicio
 {
     private static readonly string[] Porcentajes =
     [
-        ClavesParametro.IgssLaboral, ClavesParametro.IgssPatronal, ClavesParametro.Irtra, ClavesParametro.Intecap
+        ClavesParametro.IgssLaboral, ClavesParametro.IgssPatronal
     ];
 
     private readonly IParametroRepositorio _parametroRepositorio;

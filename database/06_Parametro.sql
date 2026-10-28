@@ -17,8 +17,6 @@ GO
 INSERT INTO Parametro (Clave, Valor, TipoDato, Descripcion, UsuarioIng) VALUES
     ('IGSS_LABORAL',           '4.83',                         'DECIMAL', N'Porcentaje de cuota laboral del IGSS (%)', 'SISTEMA'),
     ('IGSS_PATRONAL',          '10.67',                        'DECIMAL', N'Porcentaje de cuota patronal del IGSS (%)', 'SISTEMA'),
-    ('IRTRA',                  '1.00',                         'DECIMAL', N'Porcentaje de cuota del IRTRA (%)', 'SISTEMA'),
-    ('INTECAP',                '1.00',                         'DECIMAL', N'Porcentaje de cuota del INTECAP (%)', 'SISTEMA'),
     ('BONIFICACION_INCENTIVO', '250.00',                       'DECIMAL', N'Bonificación incentivo mensual (Q)', 'SISTEMA'),
     ('FACTOR_HORA_EXTRA',      '1.5',                          'DECIMAL', N'Multiplicador del pago de horas extra', 'SISTEMA'),
     ('SALARIO_MINIMO',         '3816.90',                      'DECIMAL', N'Salario mínimo mensual no agrícola sin bonificación (Q), circunscripción 2, Acuerdo Gubernativo 256-2025', 'SISTEMA'),

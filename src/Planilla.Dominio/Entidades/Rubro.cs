@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -6,11 +6,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Planilla.Dominio.Entidades;
 
+[Index("Codigo", Name = "UQ_Rubro_Codigo", IsUnique = true)]
 [Index("Nombre", Name = "UQ_Rubro_Nombre", IsUnique = true)]
 public partial class Rubro
 {
     [Key]
     public int IdRubro { get; set; }
+
+    [Required]
+    [StringLength(30)]
+    public string Codigo { get; set; }
 
     [Required]
     [StringLength(100)]
@@ -20,7 +25,15 @@ public partial class Rubro
     [StringLength(10)]
     public string Tipo { get; set; }
 
+    [Required]
+    [StringLength(10)]
+    public string Origen { get; set; }
+
     public bool AfectoIgss { get; set; }
+
+    public bool EsPrestacion { get; set; }
+
+    public int Orden { get; set; }
 
     [StringLength(200)]
     public string Descripcion { get; set; }
@@ -42,5 +55,8 @@ public partial class Rubro
     public DateTime? FechaAct { get; set; }
 
     [InverseProperty("IdRubroNavigation")]
-    public virtual ICollection<MovimientoNomina> MovimientoNomina { get; set; } = new List<MovimientoNomina>();
+    public virtual ICollection<NominaRubro> NominaRubro { get; set; } = new List<NominaRubro>();
+
+    [InverseProperty("IdRubroNavigation")]
+    public virtual ICollection<NominaValor> NominaValor { get; set; } = new List<NominaValor>();
 }

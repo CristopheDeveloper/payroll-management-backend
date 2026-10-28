@@ -22,6 +22,10 @@ public partial class Rubro : IAuditable { }
 
 public partial class Nomina : IAuditable { }
 
-public partial class MovimientoNomina : IAuditable { }
+public partial class TipoPlanilla : IAuditable { }
 
-public partial class NominaDetalle : IAuditable { }
+public partial class NominaEmpleado : IAuditable { }
+
+public partial class NominaValor : IAuditable { }
+
+public partial class NominaRubro : IAuditable { }

@@ -3,6 +3,8 @@ namespace Planilla.Aplicacion.DTOs;
 public class EncabezadoReporteDto
 {
     public int IdNomina { get; set; }
+    public string Codigo { get; set; }
+    public string Descripcion { get; set; }
     public string NombreEmpresa { get; set; }
     public string NitEmpresa { get; set; }
     public string DireccionEmpresa { get; set; }

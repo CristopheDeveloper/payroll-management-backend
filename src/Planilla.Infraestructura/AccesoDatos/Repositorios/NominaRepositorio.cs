@@ -13,21 +13,23 @@ public class NominaRepositorio : INominaRepositorio
         _context = context;
     }
 
-    public async Task<List<Nomina>> ObtenerTodas(int? anio)
+    public async Task<List<Nomina>> ObtenerTodas(int? anio, int? idTipoPlanilla)
     {
         return await _context.Nomina
             .AsNoTracking()
-            .Where(n => anio == null || n.Anio == anio)
+            .Include(n => n.IdTipoPlanillaNavigation)
+            .Where(n => (anio == null || n.Anio == anio) && (idTipoPlanilla == null || n.IdTipoPlanilla == idTipoPlanilla))
             .OrderByDescending(n => n.Anio)
             .ThenByDescending(n => n.Mes)
+            .ThenBy(n => n.IdTipoPlanilla)
             .ToListAsync();
     }
 
     public async Task<Dictionary<int, int>> ContarEmpleados(List<int> idsNomina)
     {
-        return await _context.NominaDetalle
-            .Where(d => idsNomina.Contains(d.IdNomina))
-            .GroupBy(d => d.IdNomina)
+        return await _context.NominaEmpleado
+            .Where(e => idsNomina.Contains(e.IdNomina))
+            .GroupBy(e => e.IdNomina)
             .Select(g => new { IdNomina = g.Key, Cantidad = g.Count() })
             .ToDictionaryAsync(x => x.IdNomina, x => x.Cantidad);
     }
@@ -36,22 +38,41 @@ public class NominaRepositorio : INominaRepositorio
     {
         return await _context.Nomina
             .AsNoTracking()
+            .Include(n => n.IdTipoPlanillaNavigation)
             .FirstOrDefaultAsync(n => n.IdNomina == idNomina);
     }
 
     public async Task<Nomina> ObtenerParaModificar(int idNomina)
     {
-        return await _context.Nomina.FindAsync(idNomina);
+        return await _context.Nomina
+            .Include(n => n.IdTipoPlanillaNavigation)
+            .FirstOrDefaultAsync(n => n.IdNomina == idNomina);
     }
 
-    public async Task<bool> Existe(int anio, int mes)
+    public async Task<bool> ExisteTipoMes(int idTipoPlanilla, int anio, int mes)
     {
-        return await _context.Nomina.AnyAsync(n => n.Anio == anio && n.Mes == mes);
+        return await _context.Nomina.AnyAsync(n => n.IdTipoPlanilla == idTipoPlanilla && n.Anio == anio && n.Mes == mes);
     }
 
-    public async Task<DateOnly?> ObtenerInicioMasAntiguo()
+    public async Task<List<string>> ObtenerCodigosDelMes(int idTipoPlanilla, int anio, int mes, int excluirId)
     {
-        return await _context.Nomina.MinAsync(n => (DateOnly?)n.FechaInicio);
+        return await _context.Nomina
+            .Where(n => n.IdTipoPlanilla == idTipoPlanilla && n.Anio == anio && n.Mes == mes && n.IdNomina != excluirId)
+            .OrderBy(n => n.Codigo)
+            .Select(n => n.Codigo)
+            .ToListAsync();
+    }
+
+    public async Task<bool> ExisteCodigo(string codigo, int? excluirId)
+    {
+        return await _context.Nomina.AnyAsync(n => n.Codigo == codigo && (excluirId == null || n.IdNomina != excluirId));
+    }
+
+    public async Task<DateOnly?> ObtenerInicioMasAntiguo(int idTipoPlanilla)
+    {
+        return await _context.Nomina
+            .Where(n => n.IdTipoPlanilla == idTipoPlanilla)
+            .MinAsync(n => (DateOnly?)n.FechaInicio);
     }
 
     public async Task<List<Nomina>> ObtenerCerradasEntre(DateOnly desde, DateOnly hasta)
@@ -63,18 +84,28 @@ public class NominaRepositorio : INominaRepositorio
             .ToListAsync();
     }
 
+    public async Task<List<TipoPlanilla>> ObtenerTiposPlanilla(bool soloActivos)
+    {
+        return await _context.TipoPlanilla
+            .AsNoTracking()
+            .Where(t => !soloActivos || t.Activo)
+            .OrderBy(t => t.IdTipoPlanilla)
+            .ToListAsync();
+    }
+
+    public async Task<TipoPlanilla> ObtenerTipoPlanilla(int idTipoPlanilla)
+    {
+        return await _context.TipoPlanilla
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.IdTipoPlanilla == idTipoPlanilla);
+    }
+
     public async Task<List<PeriodoLaboral>> ObtenerPeriodosEntre(DateOnly desde, DateOnly hasta)
     {
         return await _context.PeriodoLaboral
             .AsNoTracking()
             .Where(p => p.FechaIngreso <= hasta && (p.FechaBaja == null || p.FechaBaja >= desde))
             .ToListAsync();
-    }
-
-    public async Task<bool> TienePeriodoEntre(int idEmpleado, DateOnly desde, DateOnly hasta)
-    {
-        return await _context.PeriodoLaboral
-            .AnyAsync(p => p.IdEmpleado == idEmpleado && p.FechaIngreso <= hasta && (p.FechaBaja == null || p.FechaBaja >= desde));
     }
 
     public async Task<List<Empleado>> ObtenerEmpleados(List<int> idsEmpleado)
@@ -85,56 +116,44 @@ public class NominaRepositorio : INominaRepositorio
             .ToListAsync();
     }
 
-    public async Task<List<NominaDetalle>> ObtenerDetalle(int idNomina)
+    public async Task<List<NominaEmpleado>> ObtenerEmpleadosNomina(int idNomina)
     {
-        return await _context.NominaDetalle
+        return await _context.NominaEmpleado
             .AsNoTracking()
-            .Include(d => d.IdEmpleadoNavigation)
-            .Include(d => d.IdPuestoNavigation)
-            .Include(d => d.IdDepartamentoNavigation)
-            .Where(d => d.IdNomina == idNomina)
-            .OrderBy(d => d.IdEmpleadoNavigation.Apellidos)
-            .ThenBy(d => d.IdEmpleadoNavigation.Nombres)
+            .AsSplitQuery()
+            .Include(e => e.IdEmpleadoNavigation)
+            .Include(e => e.IdPuestoNavigation)
+            .Include(e => e.IdDepartamentoNavigation)
+            .Include(e => e.NominaValor).ThenInclude(v => v.IdRubroNavigation)
+            .Include(e => e.NominaRubro).ThenInclude(r => r.IdRubroNavigation)
+            .Where(e => e.IdNomina == idNomina)
+            .OrderBy(e => e.IdDepartamentoNavigation.Nombre)
+            .ThenBy(e => e.IdEmpleadoNavigation.Apellidos)
+            .ThenBy(e => e.IdEmpleadoNavigation.Nombres)
             .ToListAsync();
     }
 
-    public async Task<List<NominaDetalle>> ObtenerDetalleParaModificar(int idNomina)
+    public async Task<List<NominaEmpleado>> ObtenerEmpleadosNominaParaModificar(int idNomina)
     {
-        return await _context.NominaDetalle
-            .Where(d => d.IdNomina == idNomina)
+        return await _context.NominaEmpleado
+            .AsSplitQuery()
+            .Include(e => e.IdEmpleadoNavigation)
+            .Include(e => e.NominaValor).ThenInclude(v => v.IdRubroNavigation)
+            .Include(e => e.NominaRubro)
+            .Where(e => e.IdNomina == idNomina)
             .ToListAsync();
     }
 
-    public async Task<List<MovimientoNomina>> ObtenerMovimientos(int idNomina, int? idEmpleado)
+    public async Task<List<NominaEmpleado>> ObtenerPagosEmpleado(int idEmpleado)
     {
-        return await _context.MovimientoNomina
+        return await _context.NominaEmpleado
             .AsNoTracking()
-            .Include(m => m.IdEmpleadoNavigation)
-            .Include(m => m.IdRubroNavigation)
-            .Where(m => m.IdNomina == idNomina && (idEmpleado == null || m.IdEmpleado == idEmpleado))
-            .OrderBy(m => m.IdMovimiento)
+            .AsSplitQuery()
+            .Include(e => e.IdNominaNavigation).ThenInclude(n => n.IdTipoPlanillaNavigation)
+            .Include(e => e.NominaRubro).ThenInclude(r => r.IdRubroNavigation)
+            .Where(e => e.IdEmpleado == idEmpleado && e.IdNominaNavigation.Estado == "CERRADA")
+            .OrderByDescending(e => e.IdNominaNavigation.FechaInicio)
             .ToListAsync();
-    }
-
-    public async Task<List<MovimientoNomina>> ObtenerMovimientosParaModificar(int idNomina)
-    {
-        return await _context.MovimientoNomina
-            .Where(m => m.IdNomina == idNomina)
-            .ToListAsync();
-    }
-
-    public async Task<MovimientoNomina> ObtenerMovimiento(int idMovimiento)
-    {
-        return await _context.MovimientoNomina
-            .AsNoTracking()
-            .Include(m => m.IdEmpleadoNavigation)
-            .Include(m => m.IdRubroNavigation)
-            .FirstOrDefaultAsync(m => m.IdMovimiento == idMovimiento);
-    }
-
-    public async Task<MovimientoNomina> ObtenerMovimientoParaModificar(int idMovimiento)
-    {
-        return await _context.MovimientoNomina.FindAsync(idMovimiento);
     }
 
     public void Agregar(Nomina nomina)
@@ -147,29 +166,34 @@ public class NominaRepositorio : INominaRepositorio
         _context.Nomina.Remove(nomina);
     }
 
-    public void AgregarDetalle(NominaDetalle fila)
+    public void AgregarEmpleado(NominaEmpleado fila)
     {
-        _context.NominaDetalle.Add(fila);
+        _context.NominaEmpleado.Add(fila);
     }
 
-    public void EliminarDetalle(NominaDetalle fila)
+    public void EliminarEmpleado(NominaEmpleado fila)
     {
-        _context.NominaDetalle.Remove(fila);
+        _context.NominaEmpleado.Remove(fila);
     }
 
-    public void AgregarMovimiento(MovimientoNomina movimiento)
+    public void AgregarValor(NominaValor valor)
     {
-        _context.MovimientoNomina.Add(movimiento);
+        _context.NominaValor.Add(valor);
     }
 
-    public void EliminarMovimiento(MovimientoNomina movimiento)
+    public void EliminarValor(NominaValor valor)
     {
-        _context.MovimientoNomina.Remove(movimiento);
+        _context.NominaValor.Remove(valor);
     }
 
-    public void MarcarModificada(Nomina nomina)
+    public void AgregarRubro(NominaRubro rubro)
     {
-        _context.Entry(nomina).Property(n => n.FechaAct).IsModified = true;
+        _context.NominaRubro.Add(rubro);
+    }
+
+    public void EliminarRubro(NominaRubro rubro)
+    {
+        _context.NominaRubro.Remove(rubro);
     }
 
     public void FijarVersion(Nomina nomina, byte[] version)

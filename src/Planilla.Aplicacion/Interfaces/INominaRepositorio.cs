@@ -4,28 +4,29 @@ namespace Planilla.Aplicacion.Interfaces;
 
 public interface INominaRepositorio
 {
-    Task<List<Nomina>> ObtenerTodas(int? anio);
+    Task<List<Nomina>> ObtenerTodas(int? anio, int? idTipoPlanilla);
     Task<Dictionary<int, int>> ContarEmpleados(List<int> idsNomina);
     Task<Nomina> ObtenerPorId(int idNomina);
     Task<Nomina> ObtenerParaModificar(int idNomina);
-    Task<bool> Existe(int anio, int mes);
-    Task<DateOnly?> ObtenerInicioMasAntiguo();
+    Task<bool> ExisteTipoMes(int idTipoPlanilla, int anio, int mes);
+    Task<List<string>> ObtenerCodigosDelMes(int idTipoPlanilla, int anio, int mes, int excluirId);
+    Task<bool> ExisteCodigo(string codigo, int? excluirId);
+    Task<DateOnly?> ObtenerInicioMasAntiguo(int idTipoPlanilla);
     Task<List<Nomina>> ObtenerCerradasEntre(DateOnly desde, DateOnly hasta);
+    Task<List<TipoPlanilla>> ObtenerTiposPlanilla(bool soloActivos);
+    Task<TipoPlanilla> ObtenerTipoPlanilla(int idTipoPlanilla);
     Task<List<PeriodoLaboral>> ObtenerPeriodosEntre(DateOnly desde, DateOnly hasta);
-    Task<bool> TienePeriodoEntre(int idEmpleado, DateOnly desde, DateOnly hasta);
     Task<List<Empleado>> ObtenerEmpleados(List<int> idsEmpleado);
-    Task<List<NominaDetalle>> ObtenerDetalle(int idNomina);
-    Task<List<NominaDetalle>> ObtenerDetalleParaModificar(int idNomina);
-    Task<List<MovimientoNomina>> ObtenerMovimientos(int idNomina, int? idEmpleado);
-    Task<List<MovimientoNomina>> ObtenerMovimientosParaModificar(int idNomina);
-    Task<MovimientoNomina> ObtenerMovimiento(int idMovimiento);
-    Task<MovimientoNomina> ObtenerMovimientoParaModificar(int idMovimiento);
+    Task<List<NominaEmpleado>> ObtenerEmpleadosNomina(int idNomina);
+    Task<List<NominaEmpleado>> ObtenerEmpleadosNominaParaModificar(int idNomina);
+    Task<List<NominaEmpleado>> ObtenerPagosEmpleado(int idEmpleado);
     void Agregar(Nomina nomina);
     void Eliminar(Nomina nomina);
-    void AgregarDetalle(NominaDetalle fila);
-    void EliminarDetalle(NominaDetalle fila);
-    void AgregarMovimiento(MovimientoNomina movimiento);
-    void EliminarMovimiento(MovimientoNomina movimiento);
-    void MarcarModificada(Nomina nomina);
+    void AgregarEmpleado(NominaEmpleado fila);
+    void EliminarEmpleado(NominaEmpleado fila);
+    void AgregarValor(NominaValor valor);
+    void EliminarValor(NominaValor valor);
+    void AgregarRubro(NominaRubro rubro);
+    void EliminarRubro(NominaRubro rubro);
     void FijarVersion(Nomina nomina, byte[] version);
 }

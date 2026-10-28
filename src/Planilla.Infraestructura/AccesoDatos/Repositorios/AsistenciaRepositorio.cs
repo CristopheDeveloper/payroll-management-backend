@@ -56,14 +56,6 @@ public class AsistenciaRepositorio : IAsistenciaRepositorio
             .ToListAsync();
     }
 
-    public async Task<List<DateOnly>> ObtenerFechasPorEstado(int idEmpleado, string estado, DateOnly desde, DateOnly hasta)
-    {
-        return await _context.Asistencia
-            .Where(a => a.IdEmpleado == idEmpleado && a.Estado == estado && a.Fecha >= desde && a.Fecha <= hasta)
-            .Select(a => a.Fecha)
-            .ToListAsync();
-    }
-
     public async Task<List<ResumenAsistenciaDto>> ObtenerTotales(DateOnly desde, DateOnly hasta)
     {
         return await _context.Asistencia
@@ -76,7 +68,6 @@ public class AsistenciaRepositorio : IAsistenciaRepositorio
                 IdEmpleado = g.Key,
                 Faltas = g.Count(a => a.Estado == "FALTA"),
                 Permisos = g.Count(a => a.Estado == "PERMISO"),
-                Vacaciones = g.Count(a => a.Estado == "VACACIONES"),
                 SuspensionIgss = g.Count(a => a.Estado == "SUSPENSION_IGSS"),
                 HorasExtra = g.Sum(a => a.HorasExtra)
             })

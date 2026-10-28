@@ -16,7 +16,7 @@ CREATE TABLE Asistencia (
     CONSTRAINT PK_Asistencia PRIMARY KEY (IdAsistencia),
     CONSTRAINT UQ_Asistencia_Empleado_Fecha UNIQUE (IdEmpleado, Fecha),
     CONSTRAINT FK_Asistencia_Empleado FOREIGN KEY (IdEmpleado) REFERENCES Empleado (IdEmpleado),
-    CONSTRAINT CK_Asistencia_Estado CHECK (Estado IN ('PRESENTE', 'FALTA', 'PERMISO', 'VACACIONES', 'SUSPENSION_IGSS')),
+    CONSTRAINT CK_Asistencia_Estado CHECK (Estado IN ('PRESENTE', 'FALTA', 'PERMISO', 'SUSPENSION_IGSS')),
     CONSTRAINT CK_Asistencia_HorasExtra CHECK (HorasExtra >= 0 AND (Estado = 'PRESENTE' OR HorasExtra = 0))
 );
 GO

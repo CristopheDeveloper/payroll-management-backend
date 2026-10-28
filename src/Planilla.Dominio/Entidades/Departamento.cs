@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -36,5 +36,5 @@ public partial class Departamento
     public virtual ICollection<Empleado> Empleado { get; set; } = new List<Empleado>();
 
     [InverseProperty("IdDepartamentoNavigation")]
-    public virtual ICollection<NominaDetalle> NominaDetalle { get; set; } = new List<NominaDetalle>();
+    public virtual ICollection<NominaEmpleado> NominaEmpleado { get; set; } = new List<NominaEmpleado>();
 }

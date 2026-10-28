@@ -7,7 +7,6 @@ public class ResumenAsistenciaDto
     public string NombreCompleto { get; set; }
     public int Faltas { get; set; }
     public int Permisos { get; set; }
-    public int Vacaciones { get; set; }
     public int SuspensionIgss { get; set; }
     public decimal HorasExtra { get; set; }
 }

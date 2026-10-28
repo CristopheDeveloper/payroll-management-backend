@@ -20,10 +20,10 @@ public class ReporteServicio : IReporteServicio
 
     public async Task<ReportePlanillaDto> ObtenerPlanilla(int idNomina)
     {
-        var nomina = await ObtenerCalculada(idNomina);
-        var detalle = await _nominaRepositorio.ObtenerDetalle(idNomina);
+        var nomina = await ObtenerGenerada(idNomina);
+        var empleados = await _nominaRepositorio.ObtenerEmpleadosNomina(idNomina);
 
-        var departamentos = detalle
+        var departamentos = empleados
             .GroupBy(f => f.IdDepartamento)
             .Select(g => new DepartamentoReporteDto
             {
@@ -40,11 +40,9 @@ public class ReporteServicio : IReporteServicio
 
         var cuota = new CuotaPatronalDto
         {
-            IgssPatronal = detalle.Sum(f => f.IgssPatronal),
-            Irtra = detalle.Sum(f => f.Irtra),
-            Intecap = detalle.Sum(f => f.Intecap)
+            IgssPatronal = empleados.Sum(f => Monto(f, CodigosRubro.IgssPatronal))
         };
-        cuota.Total = cuota.IgssPatronal + cuota.Irtra + cuota.Intecap;
+        cuota.Total = cuota.IgssPatronal;
 
         return new ReportePlanillaDto
         {
@@ -57,38 +55,29 @@ public class ReporteServicio : IReporteServicio
 
     public async Task<ReporteBoletasDto> ObtenerBoletas(int idNomina, int? idEmpleado)
     {
-        var nomina = await ObtenerCalculada(idNomina);
-        var detalle = (await _nominaRepositorio.ObtenerDetalle(idNomina))
+        var nomina = await ObtenerGenerada(idNomina);
+        var empleados = (await _nominaRepositorio.ObtenerEmpleadosNomina(idNomina))
             .Where(f => idEmpleado == null || f.IdEmpleado == idEmpleado)
-            .OrderBy(f => f.IdDepartamentoNavigation.Nombre)
             .ToList();
-        if (idEmpleado != null && detalle.Count == 0)
+        if (idEmpleado != null && empleados.Count == 0)
         {
             throw new ReglaNegocioException("El empleado no está en la planilla.", 404);
-        }
-
-        var movimientos = (await _nominaRepositorio.ObtenerMovimientos(idNomina, idEmpleado))
-            .ToLookup(m => m.IdEmpleado);
-
-        if (detalle.Any(f => !CoincidenMovimientos(f, movimientos[f.IdEmpleado])))
-        {
-            throw new ReglaNegocioException("Los movimientos cambiaron después del último cálculo. Recalcule la planilla.", 409);
         }
 
         return new ReporteBoletasDto
         {
             Encabezado = await CrearEncabezado(nomina),
-            Boletas = detalle.Select(f => ABoleta(f, movimientos[f.IdEmpleado])).ToList()
+            Boletas = empleados.Select(ABoleta).ToList()
         };
     }
 
-    private async Task<Nomina> ObtenerCalculada(int idNomina)
+    private async Task<Nomina> ObtenerGenerada(int idNomina)
     {
         var nomina = await _nominaRepositorio.ObtenerPorId(idNomina)
             ?? throw new ReglaNegocioException("La planilla no existe.", 404);
-        if (nomina.Estado == "BORRADOR")
+        if (nomina.Estado != "GENERADA" && nomina.Estado != "CERRADA")
         {
-            throw new ReglaNegocioException("Calcule la planilla antes de generar reportes.", 409);
+            throw new ReglaNegocioException("Genere la planilla antes de imprimir reportes.", 409);
         }
         return nomina;
     }
@@ -98,6 +87,8 @@ public class ReporteServicio : IReporteServicio
         return new EncabezadoReporteDto
         {
             IdNomina = nomina.IdNomina,
+            Codigo = nomina.Codigo,
+            Descripcion = nomina.Descripcion,
             NombreEmpresa = (await _parametroRepositorio.ObtenerPorClave(ClavesParametro.NombreEmpresa))?.Valor,
             NitEmpresa = (await _parametroRepositorio.ObtenerPorClave(ClavesParametro.NitEmpresa))?.Valor,
             DireccionEmpresa = (await _parametroRepositorio.ObtenerPorClave(ClavesParametro.DireccionEmpresa))?.Valor,
@@ -112,8 +103,14 @@ public class ReporteServicio : IReporteServicio
         };
     }
 
-    private static FilaPlanillaDto AFila(NominaDetalle f)
+    private static FilaPlanillaDto AFila(NominaEmpleado f)
     {
+        var salario = Monto(f, CodigosRubro.SalarioOrdinario);
+        var horasExtra = Monto(f, CodigosRubro.HorasExtra);
+        var bonificacion = Monto(f, CodigosRubro.BonificacionIncentivo);
+        var igss = Monto(f, CodigosRubro.IgssLaboral);
+        var isr = Monto(f, CodigosRubro.Isr);
+
         return new FilaPlanillaDto
         {
             IdEmpleado = f.IdEmpleado,
@@ -122,16 +119,16 @@ public class ReporteServicio : IReporteServicio
             NombrePuesto = f.IdPuestoNavigation.Nombre,
             DiasPagar = f.DiasPagar,
             HorasExtra = f.HorasExtra,
-            SalarioDevengado = f.SalarioDevengado,
-            MontoHorasExtra = f.MontoHorasExtra,
-            Bonificacion = f.Bonificacion,
-            OtrosIngresos = f.OtrosIngresosAfectos + f.OtrosIngresosNoAfectos,
+            SalarioDevengado = salario,
+            MontoHorasExtra = horasExtra,
+            Bonificacion = bonificacion,
+            OtrosIngresos = f.TotalIngresos - salario - horasExtra - bonificacion,
             TotalIngresos = f.TotalIngresos,
-            IgssLaboral = f.IgssLaboral,
-            Isr = f.Isr,
-            OtrosDescuentos = f.OtrosDescuentos,
+            IgssLaboral = igss,
+            Isr = isr,
+            OtrosDescuentos = f.TotalDescuentos - igss - isr,
             TotalDescuentos = f.TotalDescuentos,
-            LiquidoRecibir = f.LiquidoRecibir
+            LiquidoRecibir = f.Liquido
         };
     }
 
@@ -153,40 +150,9 @@ public class ReporteServicio : IReporteServicio
         };
     }
 
-    private static bool CoincidenMovimientos(NominaDetalle f, IEnumerable<MovimientoNomina> movimientos)
+    private static BoletaDto ABoleta(NominaEmpleado f)
     {
-        var lista = movimientos.ToList();
-        return lista.Where(m => m.IdRubroNavigation.Tipo == "INGRESO" && m.IdRubroNavigation.AfectoIgss).Sum(m => m.Monto) == f.OtrosIngresosAfectos
-            && lista.Where(m => m.IdRubroNavigation.Tipo == "INGRESO" && !m.IdRubroNavigation.AfectoIgss).Sum(m => m.Monto) == f.OtrosIngresosNoAfectos
-            && lista.Where(m => m.IdRubroNavigation.Tipo == "DESCUENTO").Sum(m => m.Monto) == f.OtrosDescuentos;
-    }
-
-    private static BoletaDto ABoleta(NominaDetalle f, IEnumerable<MovimientoNomina> movimientos)
-    {
-        var ingresos = new List<LineaBoletaDto>
-        {
-            Linea("Salario devengado", f.DiasPagar == 1 ? "1 día" : $"{f.DiasPagar} días", f.SalarioDevengado)
-        };
-        if (f.HorasExtra > 0 || f.MontoHorasExtra > 0)
-        {
-            ingresos.Add(Linea("Horas extra", $"{f.HorasExtra.ToString("0.##", CultureInfo.InvariantCulture)} horas", f.MontoHorasExtra));
-        }
-        ingresos.Add(Linea("Bonificación incentivo", null, f.Bonificacion));
-        ingresos.AddRange(movimientos
-            .Where(m => m.IdRubroNavigation.Tipo == "INGRESO")
-            .Select(m => Linea(m.IdRubroNavigation.Nombre, m.Descripcion, m.Monto)));
-
-        var descuentos = new List<LineaBoletaDto>
-        {
-            Linea("IGSS laboral", null, f.IgssLaboral)
-        };
-        if (f.Isr > 0)
-        {
-            descuentos.Add(Linea("ISR", null, f.Isr));
-        }
-        descuentos.AddRange(movimientos
-            .Where(m => m.IdRubroNavigation.Tipo == "DESCUENTO")
-            .Select(m => Linea(m.IdRubroNavigation.Nombre, m.Descripcion, m.Monto)));
+        var rubros = f.NominaRubro.OrderBy(r => r.Orden).ToList();
 
         return new BoletaDto
         {
@@ -197,12 +163,29 @@ public class ReporteServicio : IReporteServicio
             NombreDepartamento = f.IdDepartamentoNavigation.Nombre,
             TipoPago = f.TipoPago,
             DiasPagar = f.DiasPagar,
-            Ingresos = ingresos,
-            Descuentos = descuentos,
+            Ingresos = rubros.Where(r => r.IdRubroNavigation.Tipo == "INGRESO").Select(r => ALinea(f, r)).ToList(),
+            Descuentos = rubros.Where(r => r.IdRubroNavigation.Tipo == "DESCUENTO").Select(r => ALinea(f, r)).ToList(),
             TotalIngresos = f.TotalIngresos,
             TotalDescuentos = f.TotalDescuentos,
-            LiquidoRecibir = f.LiquidoRecibir
+            LiquidoRecibir = f.Liquido
         };
+    }
+
+    private static LineaBoletaDto ALinea(NominaEmpleado f, NominaRubro r)
+    {
+        var detalle = r.IdRubroNavigation.Codigo switch
+        {
+            CodigosRubro.SalarioOrdinario => f.DiasPagar == 1 ? "1 día" : $"{f.DiasPagar} días",
+            CodigosRubro.HorasExtra => $"{f.HorasExtra.ToString("0.##", CultureInfo.InvariantCulture)} horas",
+            _ => r.Descripcion
+        };
+
+        return Linea(r.IdRubroNavigation.Nombre, detalle, r.Monto);
+    }
+
+    private static decimal Monto(NominaEmpleado f, string codigo)
+    {
+        return f.NominaRubro.Where(r => r.IdRubroNavigation.Codigo == codigo).Sum(r => r.Monto);
     }
 
     private static LineaBoletaDto Linea(string concepto, string detalle, decimal monto)

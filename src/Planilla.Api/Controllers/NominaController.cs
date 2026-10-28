@@ -18,10 +18,16 @@ public class NominaController : ControllerBase
         _nominaServicio = nominaServicio;
     }
 
-    [HttpGet]
-    public async Task<ActionResult<List<NominaDto>>> ObtenerTodas(int? anio = null)
+    [HttpGet("tipos")]
+    public async Task<ActionResult<List<TipoPlanillaDto>>> ObtenerTiposPlanilla(bool soloActivos = false)
     {
-        return await _nominaServicio.ObtenerTodas(anio);
+        return await _nominaServicio.ObtenerTiposPlanilla(soloActivos);
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<List<NominaDto>>> ObtenerTodas(int? anio = null, int? idTipoPlanilla = null)
+    {
+        return await _nominaServicio.ObtenerTodas(anio, idTipoPlanilla);
     }
 
     [HttpGet("{id:int}")]
@@ -37,6 +43,12 @@ public class NominaController : ControllerBase
         return CreatedAtAction(nameof(ObtenerPorId), new { id = creada.IdNomina }, creada);
     }
 
+    [HttpPut("{id:int}")]
+    public async Task<ActionResult<NominaDto>> Editar(int id, NominaEditarDto dto)
+    {
+        return await _nominaServicio.Editar(id, dto);
+    }
+
     [HttpDelete("{id:int}")]
     [Authorize(Roles = Roles.Admin)]
     public async Task<IActionResult> Eliminar(int id)
@@ -45,28 +57,52 @@ public class NominaController : ControllerBase
         return NoContent();
     }
 
+    [HttpPost("{id:int}/preparar")]
+    public async Task<ActionResult<NominaDto>> Preparar(int id)
+    {
+        return await _nominaServicio.Preparar(id);
+    }
+
     [HttpGet("{id:int}/empleados")]
-    public async Task<ActionResult<List<EmpleadoMesDto>>> ObtenerEmpleados(int id)
+    public async Task<ActionResult<List<NominaEmpleadoDto>>> ObtenerEmpleados(int id)
     {
         return await _nominaServicio.ObtenerEmpleados(id);
     }
 
-    [HttpGet("{id:int}/detalle")]
-    public async Task<ActionResult<List<NominaDetalleDto>>> ObtenerDetalle(int id)
+    [HttpPut("{id:int}/empleados/{idEmpleado:int}")]
+    public async Task<ActionResult<NominaEmpleadoDto>> GuardarDatosEmpleado(int id, int idEmpleado, DatosEmpleadoGuardarDto dto)
     {
-        return await _nominaServicio.ObtenerDetalle(id);
+        return await _nominaServicio.GuardarDatosEmpleado(id, idEmpleado, dto);
     }
 
-    [HttpGet("{id:int}/comparacion")]
-    public async Task<ActionResult<ComparacionDto>> ObtenerComparacion(int id)
+    [HttpPut("{id:int}/variables")]
+    public async Task<ActionResult<List<NominaEmpleadoDto>>> GuardarVariable(int id, VariableGuardarDto dto)
     {
-        return await _nominaServicio.ObtenerComparacion(id);
+        return await _nominaServicio.GuardarVariable(id, dto);
     }
 
-    [HttpPost("{id:int}/calcular")]
-    public async Task<ActionResult<NominaDto>> Calcular(int id, CalcularDto dto)
+    [HttpPut("{id:int}/variables/importar")]
+    public async Task<ActionResult<List<NominaEmpleadoDto>>> ImportarVariables(int id, ImportarVariablesDto dto)
     {
-        return await _nominaServicio.Calcular(id, dto);
+        return await _nominaServicio.GuardarVariables(id, dto);
+    }
+
+    [HttpPost("{id:int}/generar")]
+    public async Task<ActionResult<NominaDto>> Generar(int id)
+    {
+        return await _nominaServicio.Generar(id);
+    }
+
+    [HttpPost("{id:int}/volver-a-preparada")]
+    public async Task<ActionResult<NominaDto>> VolverAPreparada(int id)
+    {
+        return await _nominaServicio.VolverAPreparada(id);
+    }
+
+    [HttpGet("{id:int}/resumen-rubros")]
+    public async Task<ActionResult<List<ResumenRubroDto>>> ObtenerResumenRubros(int id)
+    {
+        return await _nominaServicio.ObtenerResumenRubros(id);
     }
 
     [HttpPost("{id:int}/cerrar")]

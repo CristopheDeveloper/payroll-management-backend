@@ -14,27 +14,40 @@ public class NominaServicio : INominaServicio
     private readonly INominaRepositorio _nominaRepositorio;
     private readonly IAsistenciaRepositorio _asistenciaRepositorio;
     private readonly IParametroRepositorio _parametroRepositorio;
-    private readonly IPuestoRepositorio _puestoRepositorio;
-    private readonly IDepartamentoRepositorio _departamentoRepositorio;
+    private readonly IRubroRepositorio _rubroRepositorio;
     private readonly IUsuarioActual _usuarioActual;
     private readonly IUnidadTrabajo _unidadTrabajo;
 
     public NominaServicio(INominaRepositorio nominaRepositorio, IAsistenciaRepositorio asistenciaRepositorio,
-        IParametroRepositorio parametroRepositorio, IPuestoRepositorio puestoRepositorio,
-        IDepartamentoRepositorio departamentoRepositorio, IUsuarioActual usuarioActual, IUnidadTrabajo unidadTrabajo)
+        IParametroRepositorio parametroRepositorio, IRubroRepositorio rubroRepositorio, IUsuarioActual usuarioActual,
+        IUnidadTrabajo unidadTrabajo)
     {
         _nominaRepositorio = nominaRepositorio;
         _asistenciaRepositorio = asistenciaRepositorio;
         _parametroRepositorio = parametroRepositorio;
-        _puestoRepositorio = puestoRepositorio;
-        _departamentoRepositorio = departamentoRepositorio;
+        _rubroRepositorio = rubroRepositorio;
         _usuarioActual = usuarioActual;
         _unidadTrabajo = unidadTrabajo;
     }
 
-    public async Task<List<NominaDto>> ObtenerTodas(int? anio)
+    public async Task<List<TipoPlanillaDto>> ObtenerTiposPlanilla(bool soloActivos)
     {
-        var nominas = await _nominaRepositorio.ObtenerTodas(anio);
+        var tipos = await _nominaRepositorio.ObtenerTiposPlanilla(soloActivos);
+
+        return tipos.Select(t => new TipoPlanillaDto
+        {
+            IdTipoPlanilla = t.IdTipoPlanilla,
+            Codigo = t.Codigo,
+            Nombre = t.Nombre,
+            Descripcion = t.Descripcion,
+            IncluyeIgss = t.IncluyeIgss,
+            Activo = t.Activo
+        }).ToList();
+    }
+
+    public async Task<List<NominaDto>> ObtenerTodas(int? anio, int? idTipoPlanilla)
+    {
+        var nominas = await _nominaRepositorio.ObtenerTodas(anio, idTipoPlanilla);
         var cantidades = await _nominaRepositorio.ContarEmpleados(nominas.Select(n => n.IdNomina).ToList());
 
         return nominas.Select(n => ADto(n, cantidades.GetValueOrDefault(n.IdNomina), null)).ToList();
@@ -43,39 +56,57 @@ public class NominaServicio : INominaServicio
     public async Task<NominaDto> ObtenerPorId(int idNomina)
     {
         var nomina = await ObtenerExistente(idNomina);
-        var detalle = await _nominaRepositorio.ObtenerDetalle(idNomina);
-        var codigos = detalle.ToDictionary(f => f.IdEmpleado, f => f.IdEmpleadoNavigation.CodigoEmpleado);
-        var advertencias = await CalcularAdvertencias(nomina, detalle, codigos);
+        var empleados = await _nominaRepositorio.ObtenerEmpleadosNomina(idNomina);
+        var advertencias = await CalcularAdvertencias(nomina, empleados);
 
-        return ADto(nomina, detalle.Count, advertencias);
+        return ADto(nomina, empleados.Count, advertencias);
     }
 
     public async Task<NominaDto> Crear(NominaCrearDto dto)
     {
+        var tipo = await _nominaRepositorio.ObtenerTipoPlanilla(dto.IdTipoPlanilla)
+            ?? throw new ReglaNegocioException("El tipo de planilla no existe.", 404);
+        if (!tipo.Activo)
+        {
+            throw new ReglaNegocioException($"El tipo de planilla '{tipo.Nombre}' no está habilitado.", 409);
+        }
+
         var inicio = new DateOnly(dto.Anio, dto.Mes, 1);
+        var fin = inicio.AddMonths(1).AddDays(-1);
         var hoy = Hoy();
         if (inicio > new DateOnly(hoy.Year, hoy.Month, 1).AddMonths(1))
         {
             throw new ReglaNegocioException("Solo se pueden crear planillas hasta el mes siguiente.");
         }
-        if (await _nominaRepositorio.Existe(dto.Anio, dto.Mes))
-        {
-            throw new ReglaNegocioException($"Ya existe la planilla de {dto.Mes:00}/{dto.Anio}.", 409);
-        }
-
-        var masAntigua = await _nominaRepositorio.ObtenerInicioMasAntiguo();
+        var masAntigua = await _nominaRepositorio.ObtenerInicioMasAntiguo(tipo.IdTipoPlanilla);
         if (masAntigua.HasValue && inicio < masAntigua.Value)
         {
             throw new ReglaNegocioException($"No se pueden crear planillas anteriores a la más antigua ({masAntigua.Value:MM'/'yyyy}).", 409);
         }
 
+        var codigo = string.IsNullOrWhiteSpace(dto.Codigo) ? await CodigoLibre($"MEN-{dto.Anio}-{dto.Mes:00}") : dto.Codigo.Trim().ToUpper();
+        if (await _nominaRepositorio.ExisteCodigo(codigo, null))
+        {
+            throw new ReglaNegocioException($"Ya existe una planilla con el código '{codigo}'.", 409);
+        }
+
+        var fechaPago = dto.FechaPago ?? fin;
+        ValidarFechaPago(fechaPago, inicio);
+
         var nomina = new Nomina
         {
+            IdTipoPlanilla = tipo.IdTipoPlanilla,
+            Codigo = codigo,
+            Descripcion = string.IsNullOrWhiteSpace(dto.Descripcion)
+                ? $"Salario correspondiente al mes de {NombreMes(dto.Mes)} {dto.Anio}"
+                : dto.Descripcion.Trim(),
             Anio = dto.Anio,
             Mes = dto.Mes,
             FechaInicio = inicio,
-            FechaFin = inicio.AddMonths(1).AddDays(-1),
-            Estado = "BORRADOR"
+            FechaFin = fin,
+            FechaPago = fechaPago,
+            Comentario = Texto(dto.Comentario),
+            Estado = "CREADA"
         };
 
         _nominaRepositorio.Agregar(nomina);
@@ -84,163 +115,416 @@ public class NominaServicio : INominaServicio
         return await ObtenerPorId(nomina.IdNomina);
     }
 
+    private async Task<string> CodigoLibre(string baseCodigo)
+    {
+        var codigo = baseCodigo;
+        for (var numero = 2; await _nominaRepositorio.ExisteCodigo(codigo, null); numero++)
+        {
+            codigo = $"{baseCodigo}-{numero}";
+        }
+        return codigo;
+    }
+
+    public async Task<NominaDto> Editar(int idNomina, NominaEditarDto dto)
+    {
+        var nomina = await ObtenerParaModificar(idNomina);
+        if (nomina.Estado == "CERRADA")
+        {
+            throw new ReglaNegocioException("Reabra la planilla antes de editar el encabezado.", 409);
+        }
+
+        var codigo = dto.Codigo.Trim().ToUpper();
+        if (codigo != nomina.Codigo && nomina.Estado != "CREADA")
+        {
+            throw new ReglaNegocioException("El código solo se puede cambiar en una planilla recién creada.", 409);
+        }
+        if (await _nominaRepositorio.ExisteCodigo(codigo, idNomina))
+        {
+            throw new ReglaNegocioException($"Ya existe una planilla con el código '{codigo}'.", 409);
+        }
+        ValidarFechaPago(dto.FechaPago.Value, nomina.FechaInicio);
+
+        nomina.Codigo = codigo;
+        nomina.Descripcion = dto.Descripcion.Trim();
+        nomina.FechaPago = dto.FechaPago.Value;
+        nomina.Comentario = Texto(dto.Comentario);
+        await _unidadTrabajo.GuardarCambiosAsync();
+
+        return await ObtenerPorId(idNomina);
+    }
+
     public async Task Eliminar(int idNomina)
     {
-        var nomina = await _nominaRepositorio.ObtenerParaModificar(idNomina)
-            ?? throw new ReglaNegocioException("La planilla no existe.", 404);
-
+        var nomina = await ObtenerParaModificar(idNomina);
         if (nomina.Estado == "CERRADA")
         {
             throw new ReglaNegocioException("Reabra la planilla antes de eliminarla.", 409);
         }
 
-        foreach (var fila in await _nominaRepositorio.ObtenerDetalleParaModificar(idNomina))
+        foreach (var fila in await _nominaRepositorio.ObtenerEmpleadosNominaParaModificar(idNomina))
         {
-            _nominaRepositorio.EliminarDetalle(fila);
-        }
-        foreach (var movimiento in await _nominaRepositorio.ObtenerMovimientosParaModificar(idNomina))
-        {
-            _nominaRepositorio.EliminarMovimiento(movimiento);
+            EliminarFila(fila);
         }
         _nominaRepositorio.Eliminar(nomina);
 
         await _unidadTrabajo.GuardarCambiosAsync();
     }
 
-    public async Task<List<EmpleadoMesDto>> ObtenerEmpleados(int idNomina)
+    public async Task<NominaDto> Preparar(int idNomina)
     {
-        var nomina = await ObtenerExistente(idNomina);
-        var empleados = await _asistenciaRepositorio.ObtenerEmpleadosConPeriodoEntre(nomina.FechaInicio, nomina.FechaFin);
-
-        return empleados.Select(e => new EmpleadoMesDto
+        var nomina = await ObtenerParaModificar(idNomina);
+        if (nomina.Estado != "CREADA" && nomina.Estado != "PREPARADA")
         {
-            IdEmpleado = e.IdEmpleado,
-            CodigoEmpleado = e.CodigoEmpleado,
-            NombreCompleto = $"{e.Nombres} {e.Apellidos}"
-        }).ToList();
-    }
-
-    public async Task<List<NominaDetalleDto>> ObtenerDetalle(int idNomina)
-    {
-        var nomina = await ObtenerExistente(idNomina);
-        var detalle = await _nominaRepositorio.ObtenerDetalle(idNomina);
-
-        return detalle.Select(f => ADetalleDto(f, nomina.Estado == "CERRADA"
-            ? new List<AdvertenciaDto>()
-            : AdvertenciasFila(f, nomina.DiasMes, f.IdEmpleadoNavigation.CodigoEmpleado))).ToList();
-    }
-
-    public async Task<ComparacionDto> ObtenerComparacion(int idNomina)
-    {
-        var nomina = await ObtenerExistente(idNomina);
-        if (nomina.Estado == "CERRADA")
-        {
-            throw new ReglaNegocioException("La planilla está cerrada.", 409);
-        }
-        if (nomina.FechaCalculo == null)
-        {
-            return new ComparacionDto { Diferencias = [] };
+            throw new ReglaNegocioException(nomina.Estado == "GENERADA"
+                ? "La planilla ya está generada; vuelva a preparada antes de preparar de nuevo."
+                : "La planilla está cerrada; no se puede preparar.", 409);
         }
 
-        var actuales = await LeerParametros();
-        var datos = await CargarDatosMes(nomina);
-        var detalle = await _nominaRepositorio.ObtenerDetalleParaModificar(idNomina);
-        var diferencias = BuscarDiferencias(nomina, detalle, datos.Empleados, actuales);
-
-        var puestos = (await _puestoRepositorio.ObtenerTodos(false)).ToDictionary(p => p.IdPuesto.ToString(), p => p.Nombre);
-        var departamentos = (await _departamentoRepositorio.ObtenerTodos(false)).ToDictionary(d => d.IdDepartamento.ToString(), d => d.Nombre);
-
-        foreach (var diferencia in diferencias)
+        var parametros = await LeerParametros();
+        var periodos = await _nominaRepositorio.ObtenerPeriodosEntre(nomina.FechaInicio, nomina.FechaFin);
+        var tramos = periodos
+            .GroupBy(p => p.IdEmpleado)
+            .ToDictionary(g => g.Key, g => CalculoNomina.Tramos(g, nomina.Anio, nomina.Mes));
+        if (tramos.Count == 0)
         {
-            if (diferencia.IdEmpleado.HasValue)
+            throw new ReglaNegocioException("No hay empleados con periodo laboral en el periodo de la planilla.");
+        }
+
+        var empleados = (await _nominaRepositorio.ObtenerEmpleados(tramos.Keys.ToList())).ToDictionary(e => e.IdEmpleado);
+        var asistencias = (await _asistenciaRepositorio.ObtenerTotales(nomina.FechaInicio, nomina.FechaFin))
+            .ToDictionary(a => a.IdEmpleado);
+        var filas = (await _nominaRepositorio.ObtenerEmpleadosNominaParaModificar(idNomina)).ToDictionary(f => f.IdEmpleado);
+
+        foreach (var (idEmpleado, tramosEmpleado) in tramos)
+        {
+            var empleado = empleados[idEmpleado];
+            asistencias.TryGetValue(idEmpleado, out var asistencia);
+            var faltas = asistencia?.Faltas ?? 0;
+            var suspension = asistencia?.SuspensionIgss ?? 0;
+
+            var diasPeriodo = CalculoNomina.DiasPeriodo(tramosEmpleado, parametros.DiasMes);
+            var diasSugeridos = CalculoNomina.DiasPagar(diasPeriodo, faltas + suspension, CalculoNomina.DiasCalendario(tramosEmpleado));
+
+            if (!filas.TryGetValue(idEmpleado, out var fila))
             {
-                var empleado = datos.Empleados[diferencia.IdEmpleado.Value];
-                diferencia.CodigoEmpleado = empleado.CodigoEmpleado;
-                diferencia.NombreCompleto = $"{empleado.Nombres} {empleado.Apellidos}";
+                fila = new NominaEmpleado { IdNomina = idNomina, IdEmpleado = idEmpleado };
+                _nominaRepositorio.AgregarEmpleado(fila);
             }
 
-            var nombres = diferencia.Campo == CalculoNomina.CampoIdPuesto ? puestos
-                : diferencia.Campo == CalculoNomina.CampoIdDepartamento ? departamentos
-                : null;
-            diferencia.TextoGuardado = nombres?.GetValueOrDefault(diferencia.ValorGuardado) ?? diferencia.ValorGuardado;
-            diferencia.TextoActual = nombres?.GetValueOrDefault(diferencia.ValorActual) ?? diferencia.ValorActual;
-        }
-
-        return new ComparacionDto { Diferencias = diferencias };
-    }
-
-    public async Task<NominaDto> Calcular(int idNomina, CalcularDto dto)
-    {
-        var fechaCalculo = RelojGuatemala.Ahora;
-
-        var nomina = await _nominaRepositorio.ObtenerParaModificar(idNomina)
-            ?? throw new ReglaNegocioException("La planilla no existe.", 404);
-        if (nomina.Estado == "CERRADA")
-        {
-            throw new ReglaNegocioException("La planilla está cerrada; no se puede calcular.", 409);
-        }
-
-        var actuales = await LeerParametros();
-        var datos = await CargarDatosMes(nomina);
-        var detalle = await _nominaRepositorio.ObtenerDetalleParaModificar(idNomina);
-
-        var decisiones = dto.Decisiones ?? new List<DecisionDto>();
-        ValidarDecisiones(BuscarDiferencias(nomina, detalle, datos.Empleados, actuales), decisiones);
-
-        var parametros = nomina.FechaCalculo == null || decisiones.Any(d => d.IdEmpleado == null && d.Usar == "ACTUAL")
-            ? actuales
-            : ParametrosGuardados(nomina);
-
-        var filas = detalle.ToDictionary(f => f.IdEmpleado);
-        foreach (var idEmpleado in datos.Tramos.Keys)
-        {
-            var datosEmpleado = DatosEmpleado(idEmpleado, datos, parametros);
-            if (datosEmpleado.HorasExtra > 999.99m)
+            var nueva = fila.IdNominaEmpleado == 0;
+            var conservarDias = !nueva && fila.DatosAjustados;
+            var isrDeFicha = nueva || fila.Isr == fila.RetencionIsr;
+            fila.IdPuesto = empleado.IdPuesto;
+            fila.IdDepartamento = empleado.IdDepartamento;
+            fila.Salario = empleado.Salario;
+            fila.RetencionIsr = empleado.RetencionIsr;
+            fila.TipoPago = empleado.TipoPago;
+            fila.Banco = empleado.Banco;
+            fila.CuentaBancaria = empleado.CuentaBancaria;
+            fila.DiasPeriodo = diasPeriodo;
+            fila.DiasFalta = faltas;
+            fila.DiasSuspension = suspension;
+            fila.DiasPagarSugeridos = diasSugeridos;
+            fila.HorasExtraSugeridas = 0;
+            fila.DiasPagar = conservarDias ? Math.Min(fila.DiasPagar, diasPeriodo) : diasSugeridos;
+            if (isrDeFicha)
             {
-                throw new ReglaNegocioException($"{datos.Empleados[idEmpleado].CodigoEmpleado}: la suma de horas extra del mes ({datosEmpleado.HorasExtra:0.00}) supera 999.99.", 409);
+                fila.Isr = empleado.RetencionIsr;
             }
-
-            var camposConValorActual = decisiones
-                .Where(d => d.IdEmpleado == idEmpleado && d.Usar == "ACTUAL")
-                .Select(d => d.Campo)
-                .ToHashSet();
-
-            if (filas.TryGetValue(idEmpleado, out var fila))
-            {
-                CalculoNomina.ActualizarFila(fila, datosEmpleado, camposConValorActual, false, parametros);
-            }
-            else
-            {
-                fila = new NominaDetalle { IdNomina = nomina.IdNomina, IdEmpleado = idEmpleado };
-                CalculoNomina.ActualizarFila(fila, datosEmpleado, camposConValorActual, true, parametros);
-                _nominaRepositorio.AgregarDetalle(fila);
-                filas[idEmpleado] = fila;
-            }
+            fila.DatosAjustados = EstaAjustada(fila);
+            LimpiarTotales(fila);
         }
 
-        foreach (var fila in detalle.Where(f => !datos.Tramos.ContainsKey(f.IdEmpleado)))
+        foreach (var fila in filas.Values.Where(f => !tramos.ContainsKey(f.IdEmpleado)))
         {
-            _nominaRepositorio.EliminarDetalle(fila);
+            EliminarFila(fila);
         }
 
-        var vigentes = filas.Values.Where(f => datos.Tramos.ContainsKey(f.IdEmpleado)).ToList();
-        nomina.TotalIngresos = vigentes.Sum(f => f.TotalIngresos);
-        nomina.TotalDescuentos = vigentes.Sum(f => f.TotalDescuentos);
-        nomina.TotalLiquido = vigentes.Sum(f => f.LiquidoRecibir);
-        nomina.TotalPatronal = vigentes.Sum(f => f.IgssPatronal + f.Irtra + f.Intecap);
         GuardarParametros(nomina, parametros);
-        nomina.Estado = "CALCULADA";
-        nomina.FechaCalculo = fechaCalculo;
-
+        nomina.Estado = "PREPARADA";
+        nomina.FechaPreparacion = RelojGuatemala.Ahora;
+        nomina.FechaGeneracion = null;
+        LimpiarTotales(nomina);
         await _unidadTrabajo.GuardarCambiosAsync();
 
         return await ObtenerPorId(idNomina);
     }
 
+    public async Task<List<NominaEmpleadoDto>> ObtenerEmpleados(int idNomina)
+    {
+        var nomina = await ObtenerExistente(idNomina);
+        var empleados = await _nominaRepositorio.ObtenerEmpleadosNomina(idNomina);
+        var conPeriodo = await EmpleadosConPeriodo(nomina);
+
+        return empleados.Select(e => AEmpleadoDto(e, AdvertenciasFila(nomina, e, conPeriodo))).ToList();
+    }
+
+    public async Task<NominaEmpleadoDto> GuardarDatosEmpleado(int idNomina, int idEmpleado, DatosEmpleadoGuardarDto dto)
+    {
+        await ObtenerPreparada(idNomina);
+        var filas = await _nominaRepositorio.ObtenerEmpleadosNominaParaModificar(idNomina);
+        var fila = filas.FirstOrDefault(f => f.IdEmpleado == idEmpleado)
+            ?? throw new ReglaNegocioException("El empleado no está en la planilla.", 404);
+
+        if (dto.Valores.Any(v => v == null))
+        {
+            throw new ReglaNegocioException("Hay valores vacíos en la lista.");
+        }
+        if (dto.Valores.GroupBy(v => v.IdRubro).Any(g => g.Count() > 1))
+        {
+            throw new ReglaNegocioException("Hay rubros repetidos en la lista.");
+        }
+
+        var rubros = await RubrosManuales();
+        AsignarDias(fila, dto.DiasPagar);
+        AsignarHoras(fila, dto.HorasExtra);
+        AsignarIsr(fila, dto.Isr);
+
+        foreach (var valor in fila.NominaValor.Where(v => dto.Valores.All(d => d.IdRubro != v.IdRubro || d.Monto == 0)).ToList())
+        {
+            fila.NominaValor.Remove(valor);
+            _nominaRepositorio.EliminarValor(valor);
+        }
+        foreach (var valor in dto.Valores.Where(v => v.Monto > 0))
+        {
+            AsignarValor(fila, rubros, valor.IdRubro, valor.Monto, valor.Descripcion);
+        }
+
+        fila.DatosAjustados = EstaAjustada(fila);
+        await _unidadTrabajo.GuardarCambiosAsync();
+
+        return (await ObtenerEmpleados(idNomina)).First(e => e.IdEmpleado == idEmpleado);
+    }
+
+    public async Task<List<NominaEmpleadoDto>> GuardarVariable(int idNomina, VariableGuardarDto dto)
+    {
+        return await GuardarVariables(idNomina, new ImportarVariablesDto { Variables = [dto] });
+    }
+
+    public async Task<List<NominaEmpleadoDto>> GuardarVariables(int idNomina, ImportarVariablesDto dto)
+    {
+        await ObtenerPreparada(idNomina);
+        if (dto.Variables.Any(v => v == null))
+        {
+            throw new ReglaNegocioException("Hay variables vacías en la lista.");
+        }
+        if (dto.Variables.GroupBy(v => (v.Variable, v.IdRubro)).Any(g => g.Count() > 1))
+        {
+            throw new ReglaNegocioException("Hay variables repetidas en la lista.");
+        }
+        foreach (var variable in dto.Variables)
+        {
+            ValidarVariable(variable);
+        }
+
+        var filas = (await _nominaRepositorio.ObtenerEmpleadosNominaParaModificar(idNomina)).ToDictionary(f => f.IdEmpleado);
+        var fuera = dto.Variables.SelectMany(v => v.Valores).Where(v => !filas.ContainsKey(v.IdEmpleado)).Select(v => v.IdEmpleado).Distinct().ToList();
+        if (fuera.Count > 0)
+        {
+            throw new ReglaNegocioException($"Estos empleados no están en la planilla (Id): {string.Join(", ", fuera)}.", 404);
+        }
+
+        var rubros = dto.Variables.Any(v => v.Variable == "RUBRO") ? await RubrosManuales() : null;
+        foreach (var variable in dto.Variables)
+        {
+            AplicarVariable(filas, rubros, variable);
+        }
+
+        await _unidadTrabajo.GuardarCambiosAsync();
+
+        var ids = dto.Variables.SelectMany(v => v.Valores).Select(v => v.IdEmpleado).ToHashSet();
+        return (await ObtenerEmpleados(idNomina)).Where(e => ids.Contains(e.IdEmpleado)).ToList();
+    }
+
+    private static void ValidarVariable(VariableGuardarDto dto)
+    {
+        if (dto.Valores.Any(v => v == null))
+        {
+            throw new ReglaNegocioException("Hay valores vacíos en la lista.");
+        }
+        if (dto.Valores.GroupBy(v => v.IdEmpleado).Any(g => g.Count() > 1))
+        {
+            throw new ReglaNegocioException("Hay empleados repetidos en la lista.");
+        }
+        if (dto.Variable == "RUBRO" && dto.IdRubro == null)
+        {
+            throw new ReglaNegocioException("Indique el rubro de la variable.");
+        }
+        if (dto.Variable != "RUBRO" && dto.IdRubro != null)
+        {
+            throw new ReglaNegocioException("El rubro solo se indica cuando la variable es RUBRO.");
+        }
+    }
+
+    private void AplicarVariable(Dictionary<int, NominaEmpleado> filas, Dictionary<int, Rubro> rubros, VariableGuardarDto dto)
+    {
+        foreach (var valor in dto.Valores)
+        {
+            var fila = filas[valor.IdEmpleado];
+            switch (dto.Variable)
+            {
+                case "DIAS_PAGAR":
+                    if (valor.Valor != Math.Truncate(valor.Valor))
+                    {
+                        throw new ReglaNegocioException($"{fila.IdEmpleadoNavigation.CodigoEmpleado}: los días a pagar deben ser un número entero.");
+                    }
+                    AsignarDias(fila, (int)valor.Valor);
+                    break;
+                case "HORAS_EXTRA":
+                    AsignarHoras(fila, valor.Valor);
+                    break;
+                case "ISR":
+                    AsignarIsr(fila, valor.Valor);
+                    break;
+                default:
+                    var existente = fila.NominaValor.FirstOrDefault(v => v.IdRubro == dto.IdRubro);
+                    if (valor.Valor == 0)
+                    {
+                        if (existente != null)
+                        {
+                            fila.NominaValor.Remove(existente);
+                            _nominaRepositorio.EliminarValor(existente);
+                        }
+                    }
+                    else
+                    {
+                        AsignarValor(fila, rubros, dto.IdRubro.Value, valor.Valor, valor.Descripcion);
+                    }
+                    break;
+            }
+            fila.DatosAjustados = EstaAjustada(fila);
+        }
+    }
+
+    public async Task<NominaDto> Generar(int idNomina)
+    {
+        var nomina = await ObtenerParaModificar(idNomina);
+        if (nomina.Estado != "PREPARADA" && nomina.Estado != "GENERADA")
+        {
+            throw new ReglaNegocioException(nomina.Estado == "CREADA"
+                ? "Prepare la planilla antes de generarla."
+                : "La planilla está cerrada; no se puede generar.", 409);
+        }
+
+        var parametros = ParametrosGuardados(nomina);
+        var sistema = (await _rubroRepositorio.ObtenerTodos(false, null, "SISTEMA")).ToDictionary(r => r.Codigo);
+        var manuales = (await _rubroRepositorio.ObtenerTodos(false, null, "MANUAL")).ToDictionary(r => r.IdRubro);
+        var filas = await _nominaRepositorio.ObtenerEmpleadosNominaParaModificar(idNomina);
+
+        foreach (var fila in filas)
+        {
+            foreach (var anterior in fila.NominaRubro.ToList())
+            {
+                fila.NominaRubro.Remove(anterior);
+                _nominaRepositorio.EliminarRubro(anterior);
+            }
+
+            var datos = new DatosEmpleadoMes
+            {
+                Salario = fila.Salario,
+                Isr = fila.Isr,
+                DiasPagar = fila.DiasPagar,
+                HorasExtra = fila.HorasExtra,
+                Valores = fila.NominaValor.Select(v => new ValorManual
+                {
+                    IdRubro = v.IdRubro,
+                    Tipo = manuales[v.IdRubro].Tipo,
+                    AfectoIgss = manuales[v.IdRubro].AfectoIgss,
+                    Orden = manuales[v.IdRubro].Orden,
+                    Monto = v.Monto,
+                    Descripcion = v.Descripcion
+                }).ToList()
+            };
+
+            var calculados = CalculoNomina.GenerarRubros(datos, parametros);
+            foreach (var calculado in calculados)
+            {
+                var rubro = calculado.IdRubro.HasValue
+                    ? manuales[calculado.IdRubro.Value]
+                    : sistema.GetValueOrDefault(calculado.Codigo)
+                        ?? throw new InvalidOperationException($"Falta el rubro del sistema {calculado.Codigo}.");
+
+                var nuevo = new NominaRubro
+                {
+                    IdNominaEmpleado = fila.IdNominaEmpleado,
+                    IdRubro = rubro.IdRubro,
+                    Orden = rubro.Orden,
+                    Base = calculado.Base,
+                    Monto = calculado.Monto,
+                    Descripcion = calculado.Descripcion
+                };
+                fila.NominaRubro.Add(nuevo);
+                _nominaRepositorio.AgregarRubro(nuevo);
+            }
+
+            fila.TotalIngresos = CalculoNomina.Total(calculados, "INGRESO");
+            fila.TotalDescuentos = CalculoNomina.Total(calculados, "DESCUENTO");
+            fila.Liquido = fila.TotalIngresos - fila.TotalDescuentos;
+            fila.TotalPatronal = CalculoNomina.Total(calculados, "PATRONAL");
+        }
+
+        nomina.TotalIngresos = filas.Sum(f => f.TotalIngresos);
+        nomina.TotalDescuentos = filas.Sum(f => f.TotalDescuentos);
+        nomina.TotalLiquido = filas.Sum(f => f.Liquido);
+        nomina.TotalPatronal = filas.Sum(f => f.TotalPatronal);
+        nomina.Estado = "GENERADA";
+        nomina.FechaGeneracion = RelojGuatemala.Ahora;
+        await _unidadTrabajo.GuardarCambiosAsync();
+
+        return await ObtenerPorId(idNomina);
+    }
+
+    public async Task<NominaDto> VolverAPreparada(int idNomina)
+    {
+        var nomina = await ObtenerParaModificar(idNomina);
+        if (nomina.Estado != "GENERADA")
+        {
+            throw new ReglaNegocioException("Solo una planilla generada puede volver a preparada.", 409);
+        }
+
+        foreach (var fila in await _nominaRepositorio.ObtenerEmpleadosNominaParaModificar(idNomina))
+        {
+            foreach (var rubro in fila.NominaRubro.ToList())
+            {
+                fila.NominaRubro.Remove(rubro);
+                _nominaRepositorio.EliminarRubro(rubro);
+            }
+            LimpiarTotales(fila);
+        }
+
+        nomina.Estado = "PREPARADA";
+        nomina.FechaGeneracion = null;
+        LimpiarTotales(nomina);
+        await _unidadTrabajo.GuardarCambiosAsync();
+
+        return await ObtenerPorId(idNomina);
+    }
+
+    public async Task<List<ResumenRubroDto>> ObtenerResumenRubros(int idNomina)
+    {
+        await ObtenerExistente(idNomina);
+        var empleados = await _nominaRepositorio.ObtenerEmpleadosNomina(idNomina);
+
+        return empleados
+            .SelectMany(e => e.NominaRubro)
+            .GroupBy(r => r.IdRubro)
+            .Select(g => new ResumenRubroDto
+            {
+                IdRubro = g.Key,
+                Codigo = g.First().IdRubroNavigation.Codigo,
+                Nombre = g.First().IdRubroNavigation.Nombre,
+                Tipo = g.First().IdRubroNavigation.Tipo,
+                Orden = g.First().Orden,
+                Empleados = g.Count(),
+                Total = g.Sum(r => r.Monto)
+            })
+            .OrderBy(r => r.Orden)
+            .ToList();
+    }
+
     public async Task<NominaDto> Cerrar(int idNomina, CerrarDto dto)
     {
-        var nomina = await _nominaRepositorio.ObtenerParaModificar(idNomina)
-            ?? throw new ReglaNegocioException("La planilla no existe.", 404);
+        var nomina = await ObtenerParaModificar(idNomina);
 
         byte[] version;
         try
@@ -257,39 +541,17 @@ public class NominaServicio : INominaServicio
         {
             throw new ReglaNegocioException("La planilla ya está cerrada.", 409);
         }
-        if (nomina.Estado != "CALCULADA")
+        if (nomina.Estado != "GENERADA")
         {
-            throw new ReglaNegocioException("Solo se puede cerrar una planilla calculada.", 409);
+            throw new ReglaNegocioException("Solo se puede cerrar una planilla generada.", 409);
         }
         if (!nomina.Version.SequenceEqual(version))
         {
             throw new ReglaNegocioException("Otra persona modificó la planilla; recárguela y revísela antes de cerrar.", 409, "RECARGAR");
         }
 
-        var datos = await CargarDatosMes(nomina);
-        var parametros = ParametrosGuardados(nomina);
-        var detalle = await _nominaRepositorio.ObtenerDetalleParaModificar(idNomina);
-        var filas = detalle.ToDictionary(f => f.IdEmpleado);
-
-        var hayCambios = datos.Tramos.Keys.Any(id => !filas.ContainsKey(id)) || filas.Keys.Any(id => !datos.Tramos.ContainsKey(id));
-        foreach (var fila in detalle)
-        {
-            if (hayCambios)
-            {
-                break;
-            }
-
-            var antes = CalculoNomina.Firma(fila);
-            CalculoNomina.ActualizarFila(fila, DatosEmpleado(fila.IdEmpleado, datos, parametros), new HashSet<string>(), false, parametros);
-            hayCambios = CalculoNomina.Firma(fila) != antes;
-        }
-        if (hayCambios)
-        {
-            throw new ReglaNegocioException("Hubo cambios desde el último cálculo; recalcule y revise antes de cerrar.", 409, "RECALCULAR");
-        }
-
-        var codigos = datos.Empleados.ToDictionary(e => e.Key, e => e.Value.CodigoEmpleado);
-        var bloqueos = (await CalcularAdvertencias(nomina, detalle, codigos)).Where(a => a.Bloquea).ToList();
+        var empleados = await _nominaRepositorio.ObtenerEmpleadosNomina(idNomina);
+        var bloqueos = (await CalcularAdvertencias(nomina, empleados)).Where(a => a.Bloquea).ToList();
         if (bloqueos.Count > 0)
         {
             var mensajes = string.Join(" ", bloqueos.Take(5).Select(a => a.Mensaje));
@@ -307,15 +569,13 @@ public class NominaServicio : INominaServicio
 
     public async Task<NominaDto> Reabrir(int idNomina, ReabrirDto dto)
     {
-        var nomina = await _nominaRepositorio.ObtenerParaModificar(idNomina)
-            ?? throw new ReglaNegocioException("La planilla no existe.", 404);
-
+        var nomina = await ObtenerParaModificar(idNomina);
         if (nomina.Estado != "CERRADA")
         {
             throw new ReglaNegocioException("Solo se puede reabrir una planilla cerrada.", 409);
         }
 
-        nomina.Estado = "CALCULADA";
+        nomina.Estado = "GENERADA";
         nomina.UsuarioCierre = null;
         nomina.FechaCierre = null;
         nomina.MotivoReapertura = dto.Motivo.Trim();
@@ -324,141 +584,161 @@ public class NominaServicio : INominaServicio
         return await ObtenerPorId(idNomina);
     }
 
+    public async Task<List<PagoEmpleadoDto>> ObtenerPagosEmpleado(int idEmpleado)
+    {
+        var pagos = await _nominaRepositorio.ObtenerPagosEmpleado(idEmpleado);
+
+        return pagos.Select(p => new PagoEmpleadoDto
+        {
+            IdNomina = p.IdNomina,
+            Codigo = p.IdNominaNavigation.Codigo,
+            Descripcion = p.IdNominaNavigation.Descripcion,
+            NombreTipoPlanilla = p.IdNominaNavigation.IdTipoPlanillaNavigation.Nombre,
+            Anio = p.IdNominaNavigation.Anio,
+            Mes = p.IdNominaNavigation.Mes,
+            FechaPago = p.IdNominaNavigation.FechaPago,
+            DiasPagar = p.DiasPagar,
+            TotalIngresos = p.TotalIngresos,
+            TotalDescuentos = p.TotalDescuentos,
+            Liquido = p.Liquido,
+            Rubros = p.NominaRubro.OrderBy(r => r.Orden).Select(ARubroDto).ToList()
+        }).ToList();
+    }
+
     private async Task<Nomina> ObtenerExistente(int idNomina)
     {
         return await _nominaRepositorio.ObtenerPorId(idNomina)
             ?? throw new ReglaNegocioException("La planilla no existe.", 404);
     }
 
-    private async Task<DatosMes> CargarDatosMes(Nomina nomina)
+    private async Task<Nomina> ObtenerParaModificar(int idNomina)
     {
-        var periodos = await _nominaRepositorio.ObtenerPeriodosEntre(nomina.FechaInicio, nomina.FechaFin);
-        var tramos = periodos
-            .GroupBy(p => p.IdEmpleado)
-            .ToDictionary(g => g.Key, g => CalculoNomina.Tramos(g, nomina.Anio, nomina.Mes));
-        var empleados = (await _nominaRepositorio.ObtenerEmpleados(tramos.Keys.ToList()))
-            .ToDictionary(e => e.IdEmpleado);
-        var asistencias = (await _asistenciaRepositorio.ObtenerTotales(nomina.FechaInicio, nomina.FechaFin))
-            .ToDictionary(a => a.IdEmpleado);
-        var movimientos = await _nominaRepositorio.ObtenerMovimientos(nomina.IdNomina, null);
-
-        return new DatosMes
-        {
-            Tramos = tramos,
-            Empleados = empleados,
-            Asistencias = asistencias,
-            Movimientos = movimientos
-        };
+        return await _nominaRepositorio.ObtenerParaModificar(idNomina)
+            ?? throw new ReglaNegocioException("La planilla no existe.", 404);
     }
 
-    private static DatosEmpleadoMes DatosEmpleado(int idEmpleado, DatosMes datos, ParametrosNomina parametros)
+    private async Task<Nomina> ObtenerPreparada(int idNomina)
     {
-        var empleado = datos.Empleados[idEmpleado];
-        var tramos = datos.Tramos[idEmpleado];
-        datos.Asistencias.TryGetValue(idEmpleado, out var asistencia);
-        var movimientos = datos.Movimientos.Where(m => m.IdEmpleado == idEmpleado).ToList();
-
-        var faltas = asistencia?.Faltas ?? 0;
-        var suspensiones = asistencia?.SuspensionIgss ?? 0;
-        var diasPeriodo = CalculoNomina.DiasPeriodo(tramos, parametros.DiasMes);
-
-        return new DatosEmpleadoMes
+        var nomina = await ObtenerExistente(idNomina);
+        if (nomina.Estado != "PREPARADA")
         {
-            Salario = empleado.Salario,
-            RetencionIsr = empleado.RetencionIsr,
-            IdPuesto = empleado.IdPuesto,
-            IdDepartamento = empleado.IdDepartamento,
-            TipoPago = empleado.TipoPago,
-            DiasPeriodo = diasPeriodo,
-            DiasFalta = faltas,
-            DiasSuspension = suspensiones,
-            DiasPagar = CalculoNomina.DiasPagar(diasPeriodo, faltas + suspensiones, CalculoNomina.DiasCalendario(tramos)),
-            HorasExtra = asistencia?.HorasExtra ?? 0,
-            OtrosIngresosAfectos = movimientos
-                .Where(m => m.IdRubroNavigation.Tipo == "INGRESO" && m.IdRubroNavigation.AfectoIgss)
-                .Sum(m => m.Monto),
-            OtrosIngresosNoAfectos = movimientos
-                .Where(m => m.IdRubroNavigation.Tipo == "INGRESO" && !m.IdRubroNavigation.AfectoIgss)
-                .Sum(m => m.Monto),
-            OtrosDescuentos = movimientos
-                .Where(m => m.IdRubroNavigation.Tipo == "DESCUENTO")
-                .Sum(m => m.Monto)
-        };
-    }
-
-    private static List<DiferenciaDto> BuscarDiferencias(Nomina nomina, List<NominaDetalle> detalle,
-        Dictionary<int, Empleado> empleados, ParametrosNomina actuales)
-    {
-        var diferencias = new List<DiferenciaDto>();
-
-        foreach (var fila in detalle)
-        {
-            if (!empleados.TryGetValue(fila.IdEmpleado, out var empleado))
+            throw new ReglaNegocioException(nomina.Estado switch
             {
-                continue;
+                "CREADA" => "Prepare la planilla antes de capturar datos.",
+                "GENERADA" => "La planilla ya está generada; vuelva a preparada para cambiar datos.",
+                _ => "La planilla está cerrada; no se pueden cambiar datos."
+            }, 409);
+        }
+
+        return nomina;
+    }
+
+    private async Task<Dictionary<int, Rubro>> RubrosManuales()
+    {
+        return (await _rubroRepositorio.ObtenerTodos(false, null, "MANUAL")).ToDictionary(r => r.IdRubro);
+    }
+
+    private void AsignarValor(NominaEmpleado fila, Dictionary<int, Rubro> rubros, int idRubro, decimal monto, string descripcion)
+    {
+        if (!rubros.TryGetValue(idRubro, out var rubro))
+        {
+            throw new ReglaNegocioException($"El rubro {idRubro} no existe o no es un rubro manual.", 404);
+        }
+
+        var existente = fila.NominaValor.FirstOrDefault(v => v.IdRubro == idRubro);
+        if (existente == null)
+        {
+            if (!rubro.Activo)
+            {
+                throw new ReglaNegocioException($"El rubro '{rubro.Nombre}' está inactivo.", 409);
             }
 
-            AgregarDiferencia(diferencias, fila.IdEmpleado, CalculoNomina.CampoSalario, Formato(fila.Salario), Formato(empleado.Salario));
-            AgregarDiferencia(diferencias, fila.IdEmpleado, CalculoNomina.CampoRetencionIsr, Formato(fila.RetencionIsr), Formato(empleado.RetencionIsr));
-            AgregarDiferencia(diferencias, fila.IdEmpleado, CalculoNomina.CampoIdPuesto, fila.IdPuesto.ToString(), empleado.IdPuesto.ToString());
-            AgregarDiferencia(diferencias, fila.IdEmpleado, CalculoNomina.CampoIdDepartamento, fila.IdDepartamento.ToString(), empleado.IdDepartamento.ToString());
-            AgregarDiferencia(diferencias, fila.IdEmpleado, CalculoNomina.CampoTipoPago, fila.TipoPago, empleado.TipoPago);
+            existente = new NominaValor { IdNominaEmpleado = fila.IdNominaEmpleado, IdRubro = idRubro };
+            fila.NominaValor.Add(existente);
+            _nominaRepositorio.AgregarValor(existente);
         }
 
-        if (nomina.FechaCalculo != null)
-        {
-            var guardados = ParametrosGuardados(nomina);
-            AgregarDiferencia(diferencias, null, ClavesParametro.IgssLaboral, Formato(guardados.IgssLaboral), Formato(actuales.IgssLaboral));
-            AgregarDiferencia(diferencias, null, ClavesParametro.IgssPatronal, Formato(guardados.IgssPatronal), Formato(actuales.IgssPatronal));
-            AgregarDiferencia(diferencias, null, ClavesParametro.Irtra, Formato(guardados.Irtra), Formato(actuales.Irtra));
-            AgregarDiferencia(diferencias, null, ClavesParametro.Intecap, Formato(guardados.Intecap), Formato(actuales.Intecap));
-            AgregarDiferencia(diferencias, null, ClavesParametro.BonificacionIncentivo, Formato(guardados.BonificacionIncentivo), Formato(actuales.BonificacionIncentivo));
-            AgregarDiferencia(diferencias, null, ClavesParametro.FactorHoraExtra, Formato(guardados.FactorHoraExtra), Formato(actuales.FactorHoraExtra));
-            AgregarDiferencia(diferencias, null, ClavesParametro.DiasMes, guardados.DiasMes.ToString(), actuales.DiasMes.ToString());
-            AgregarDiferencia(diferencias, null, ClavesParametro.HorasMes, guardados.HorasMes.ToString(), actuales.HorasMes.ToString());
-        }
-
-        return diferencias;
+        existente.Monto = monto;
+        existente.Descripcion = Texto(descripcion);
     }
 
-    private static void AgregarDiferencia(List<DiferenciaDto> diferencias, int? idEmpleado, string campo, string guardado, string actual)
+    private static void AsignarDias(NominaEmpleado fila, int dias)
     {
-        if (guardado != actual)
+        if (dias < 0 || dias > fila.DiasPeriodo)
         {
-            diferencias.Add(new DiferenciaDto
-            {
-                IdEmpleado = idEmpleado,
-                Campo = campo,
-                ValorGuardado = guardado,
-                ValorActual = actual
-            });
+            throw new ReglaNegocioException($"{fila.IdEmpleadoNavigation.CodigoEmpleado}: los días a pagar deben estar entre 0 y {fila.DiasPeriodo} (días del periodo).");
         }
+        fila.DiasPagar = dias;
     }
 
-    private static void ValidarDecisiones(List<DiferenciaDto> diferencias, List<DecisionDto> decisiones)
+    private static void AsignarHoras(NominaEmpleado fila, decimal horas)
     {
-        if (decisiones.Any(d => d == null))
+        if (horas < 0 || horas > 999.99m || horas != Math.Round(horas, 2))
         {
-            throw new ReglaNegocioException("Hay decisiones vacías en la lista.");
+            throw new ReglaNegocioException($"{fila.IdEmpleadoNavigation.CodigoEmpleado}: las horas extra deben estar entre 0 y 999.99, con máximo 2 decimales.");
         }
-        if (decisiones.Where(d => d.IdEmpleado == null).Select(d => d.Usar).Distinct().Count() > 1)
-        {
-            throw new ReglaNegocioException("Los parámetros se deciden juntos: use la misma opción para todos.");
-        }
+        fila.HorasExtra = horas;
+    }
 
-        var completas = decisiones.Count == diferencias.Count && diferencias.All(dif =>
+    private static void AsignarIsr(NominaEmpleado fila, decimal isr)
+    {
+        if (isr < 0 || isr != Math.Round(isr, 2))
         {
-            var coincidentes = decisiones.Where(d => d.IdEmpleado == dif.IdEmpleado && d.Campo == dif.Campo).ToList();
-            return coincidentes.Count == 1 && coincidentes[0].ValorActual == dif.ValorActual;
-        });
-        if (!completas)
+            throw new ReglaNegocioException($"{fila.IdEmpleadoNavigation.CodigoEmpleado}: el ISR debe ser positivo y con máximo 2 decimales.");
+        }
+        fila.Isr = isr;
+    }
+
+    private static bool EstaAjustada(NominaEmpleado fila)
+    {
+        return fila.DiasPagar != fila.DiasPagarSugeridos;
+    }
+
+    private void EliminarFila(NominaEmpleado fila)
+    {
+        foreach (var rubro in fila.NominaRubro.ToList())
         {
-            throw new ReglaNegocioException("Los datos cambiaron desde la comparación; vuelva a comparar antes de calcular.", 409, "COMPARAR_DE_NUEVO");
+            _nominaRepositorio.EliminarRubro(rubro);
+        }
+        foreach (var valor in fila.NominaValor.ToList())
+        {
+            _nominaRepositorio.EliminarValor(valor);
+        }
+        _nominaRepositorio.EliminarEmpleado(fila);
+    }
+
+    private static void LimpiarTotales(NominaEmpleado fila)
+    {
+        fila.TotalIngresos = 0;
+        fila.TotalDescuentos = 0;
+        fila.Liquido = 0;
+        fila.TotalPatronal = 0;
+    }
+
+    private static void LimpiarTotales(Nomina nomina)
+    {
+        nomina.TotalIngresos = 0;
+        nomina.TotalDescuentos = 0;
+        nomina.TotalLiquido = 0;
+        nomina.TotalPatronal = 0;
+    }
+
+    private static void ValidarFechaPago(DateOnly fechaPago, DateOnly inicio)
+    {
+        if (fechaPago < inicio || fechaPago > inicio.AddMonths(2))
+        {
+            throw new ReglaNegocioException("La fecha de pago debe estar entre el inicio del periodo y dos meses después.");
         }
     }
 
-    private async Task<List<AdvertenciaDto>> CalcularAdvertencias(Nomina nomina, List<NominaDetalle> detalle,
-        Dictionary<int, string> codigos)
+    private async Task<HashSet<int>> EmpleadosConPeriodo(Nomina nomina)
+    {
+        return (await _nominaRepositorio.ObtenerPeriodosEntre(nomina.FechaInicio, nomina.FechaFin))
+            .Select(p => p.IdEmpleado)
+            .ToHashSet();
+    }
+
+    private async Task<List<AdvertenciaDto>> CalcularAdvertencias(Nomina nomina, List<NominaEmpleado> empleados)
     {
         var advertencias = new List<AdvertenciaDto>();
         if (nomina.Estado == "CERRADA")
@@ -466,59 +746,71 @@ public class NominaServicio : INominaServicio
             return advertencias;
         }
 
-        foreach (var fila in detalle)
+        var conPeriodo = await EmpleadosConPeriodo(nomina);
+        foreach (var fila in empleados)
         {
-            advertencias.AddRange(AdvertenciasFila(fila, nomina.DiasMes, codigos.GetValueOrDefault(fila.IdEmpleado)));
+            advertencias.AddRange(AdvertenciasFila(nomina, fila, conPeriodo));
         }
 
         var hoy = Hoy();
-        if (nomina.FechaInicio > hoy)
-        {
-            advertencias.Add(Advertencia("MES_NO_INICIADO", "El mes de la planilla todavía no inicia.", true, null));
-        }
-        else if (nomina.FechaFin > hoy)
+        if (nomina.FechaFin > hoy)
         {
             advertencias.Add(Advertencia("MES_NO_TERMINADO", "El mes todavía no termina; puede haber asistencias pendientes.", false, null));
         }
 
-        var masAntigua = await _nominaRepositorio.ObtenerInicioMasAntiguo();
+        var otras = await _nominaRepositorio.ObtenerCodigosDelMes(nomina.IdTipoPlanilla, nomina.Anio, nomina.Mes, nomina.IdNomina);
+        if (otras.Count > 0)
+        {
+            advertencias.Add(Advertencia("OTRA_PLANILLA_MES",
+                $"{(otras.Count == 1 ? "Hay otra planilla" : "Hay otras planillas")} de {nomina.Mes:00}/{nomina.Anio}: {string.Join(", ", otras)}.", false, null));
+        }
+
+        var masAntigua = await _nominaRepositorio.ObtenerInicioMasAntiguo(nomina.IdTipoPlanilla);
         var anterior = nomina.FechaInicio.AddMonths(-1);
-        if (masAntigua < nomina.FechaInicio && !await _nominaRepositorio.Existe(anterior.Year, anterior.Month))
+        if (masAntigua < nomina.FechaInicio && !await _nominaRepositorio.ExisteTipoMes(nomina.IdTipoPlanilla, anterior.Year, anterior.Month))
         {
             advertencias.Add(Advertencia("MES_ANTERIOR_FALTANTE", $"Falta crear la planilla de {anterior:MM'/'yyyy}.", true, null));
         }
 
-        var movimientos = await _nominaRepositorio.ObtenerMovimientos(nomina.IdNomina, null);
-        var conPeriodo = (await _nominaRepositorio.ObtenerPeriodosEntre(nomina.FechaInicio, nomina.FechaFin))
-            .Select(p => p.IdEmpleado)
-            .ToHashSet();
-        var sinPeriodo = movimientos
-            .Where(m => !conPeriodo.Contains(m.IdEmpleado))
-            .Select(m => m.IdEmpleadoNavigation.CodigoEmpleado)
-            .Distinct()
-            .ToList();
-        if (sinPeriodo.Count > 0)
+        if (nomina.Estado != "CREADA")
         {
-            advertencias.Add(Advertencia("MOVIMIENTOS_SIN_PERIODO",
-                $"Hay movimientos de empleados sin periodo laboral en el mes: {string.Join(", ", sinPeriodo)}. Elimínelos o corrija el periodo.", true, null));
+            var faltantes = conPeriodo.Count(id => empleados.All(e => e.IdEmpleado != id));
+            if (faltantes > 0)
+            {
+                advertencias.Add(Advertencia("EMPLEADOS_NUEVOS",
+                    faltantes == 1
+                        ? "Hay 1 empleado con periodo laboral que no está en la planilla; prepárela de nuevo para incluirlo."
+                        : $"Hay {faltantes} empleados con periodo laboral que no están en la planilla; prepárela de nuevo para incluirlos.",
+                    true, null));
+            }
         }
 
         return advertencias;
     }
 
-    private static List<AdvertenciaDto> AdvertenciasFila(NominaDetalle fila, int? diasMes, string codigo)
+    private static List<AdvertenciaDto> AdvertenciasFila(Nomina nomina, NominaEmpleado fila, HashSet<int> conPeriodo)
     {
         var advertencias = new List<AdvertenciaDto>();
+        if (nomina.Estado == "CERRADA")
+        {
+            return advertencias;
+        }
 
-        if (fila.LiquidoRecibir < 0)
+        var codigo = fila.IdEmpleadoNavigation.CodigoEmpleado;
+        if (!conPeriodo.Contains(fila.IdEmpleado))
+        {
+            advertencias.Add(Advertencia("SIN_PERIODO",
+                $"{codigo}: ya no tiene periodo laboral en el mes; prepare la planilla de nuevo.", true, fila.IdEmpleado));
+        }
+        if (fila.Liquido < 0)
         {
             advertencias.Add(Advertencia("LIQUIDO_NEGATIVO",
-                $"{codigo}: el líquido a recibir es negativo (Q{Monto(fila.LiquidoRecibir)}).", true, fila.IdEmpleado));
+                $"{codigo}: el líquido a recibir es negativo (Q{Monto(fila.Liquido)}).", true, fila.IdEmpleado));
         }
-        if (diasMes.HasValue && fila.DiasPeriodo < diasMes.Value && fila.Isr > 0)
+        if (nomina.DiasMes.HasValue && fila.DiasPeriodo < nomina.DiasMes.Value && fila.Isr > 0)
         {
             advertencias.Add(Advertencia("ISR_PERIODO_PARCIAL",
-                $"{codigo}: trabajó parte del mes y se le retiene el ISR completo (Q{Monto(fila.Isr)}); revise si corresponde.", false, fila.IdEmpleado));
+                $"{codigo}: trabajó parte del mes; se le retiene el ISR mensual completo (Q{Monto(fila.Isr)}).", false, fila.IdEmpleado));
         }
 
         return advertencias;
@@ -543,8 +835,6 @@ public class NominaServicio : INominaServicio
         {
             IgssLaboral = LeerDecimal(valores, ClavesParametro.IgssLaboral, 0, 100, 4),
             IgssPatronal = LeerDecimal(valores, ClavesParametro.IgssPatronal, 0, 100, 4),
-            Irtra = LeerDecimal(valores, ClavesParametro.Irtra, 0, 100, 4),
-            Intecap = LeerDecimal(valores, ClavesParametro.Intecap, 0, 100, 4),
             BonificacionIncentivo = LeerDecimal(valores, ClavesParametro.BonificacionIncentivo, 0, 99999999.99m, 2),
             FactorHoraExtra = LeerDecimal(valores, ClavesParametro.FactorHoraExtra, 1, 10, 4),
             DiasMes = (int)LeerDecimal(valores, ClavesParametro.DiasMes, 1, 31, 0),
@@ -571,8 +861,6 @@ public class NominaServicio : INominaServicio
         {
             IgssLaboral = nomina.IgssLaboral.Value,
             IgssPatronal = nomina.IgssPatronal.Value,
-            Irtra = nomina.Irtra.Value,
-            Intecap = nomina.Intecap.Value,
             BonificacionIncentivo = nomina.BonificacionIncentivo.Value,
             FactorHoraExtra = nomina.FactorHoraExtra.Value,
             DiasMes = nomina.DiasMes.Value,
@@ -584,17 +872,20 @@ public class NominaServicio : INominaServicio
     {
         nomina.IgssLaboral = parametros.IgssLaboral;
         nomina.IgssPatronal = parametros.IgssPatronal;
-        nomina.Irtra = parametros.Irtra;
-        nomina.Intecap = parametros.Intecap;
         nomina.BonificacionIncentivo = parametros.BonificacionIncentivo;
         nomina.FactorHoraExtra = parametros.FactorHoraExtra;
         nomina.DiasMes = parametros.DiasMes;
         nomina.HorasMes = parametros.HorasMes;
     }
 
-    private static string Formato(decimal valor)
+    private static string NombreMes(int mes)
     {
-        return valor.ToString("0.####", CultureInfo.InvariantCulture);
+        return CultureInfo.GetCultureInfo("es-ES").DateTimeFormat.GetMonthName(mes);
+    }
+
+    private static string Texto(string valor)
+    {
+        return string.IsNullOrWhiteSpace(valor) ? null : valor.Trim();
     }
 
     private static string Monto(decimal valor)
@@ -612,21 +903,27 @@ public class NominaServicio : INominaServicio
         return new NominaDto
         {
             IdNomina = nomina.IdNomina,
+            IdTipoPlanilla = nomina.IdTipoPlanilla,
+            CodigoTipoPlanilla = nomina.IdTipoPlanillaNavigation?.Codigo,
+            NombreTipoPlanilla = nomina.IdTipoPlanillaNavigation?.Nombre,
+            Codigo = nomina.Codigo,
+            Descripcion = nomina.Descripcion,
             Anio = nomina.Anio,
             Mes = nomina.Mes,
-            Estado = nomina.Estado,
             FechaInicio = nomina.FechaInicio,
             FechaFin = nomina.FechaFin,
+            FechaPago = nomina.FechaPago,
+            Comentario = nomina.Comentario,
+            Estado = nomina.Estado,
             TotalIngresos = nomina.TotalIngresos,
             TotalDescuentos = nomina.TotalDescuentos,
             TotalLiquido = nomina.TotalLiquido,
             TotalPatronal = nomina.TotalPatronal,
             CantidadEmpleados = cantidadEmpleados,
-            FechaCalculo = nomina.FechaCalculo,
+            FechaPreparacion = nomina.FechaPreparacion,
+            FechaGeneracion = nomina.FechaGeneracion,
             IgssLaboral = nomina.IgssLaboral,
             IgssPatronal = nomina.IgssPatronal,
-            Irtra = nomina.Irtra,
-            Intecap = nomina.Intecap,
             BonificacionIncentivo = nomina.BonificacionIncentivo,
             FactorHoraExtra = nomina.FactorHoraExtra,
             DiasMes = nomina.DiasMes,
@@ -635,54 +932,69 @@ public class NominaServicio : INominaServicio
             FechaCierre = nomina.FechaCierre,
             MotivoReapertura = nomina.MotivoReapertura,
             Version = nomina.Version == null ? null : Convert.ToBase64String(nomina.Version),
-            PuedeCerrar = advertencias == null ? null : nomina.Estado == "CALCULADA" && !advertencias.Any(a => a.Bloquea),
+            PuedeCerrar = advertencias == null ? null : nomina.Estado == "GENERADA" && !advertencias.Any(a => a.Bloquea),
             Advertencias = advertencias
         };
     }
 
-    private static NominaDetalleDto ADetalleDto(NominaDetalle fila, List<AdvertenciaDto> advertencias)
+    private static NominaEmpleadoDto AEmpleadoDto(NominaEmpleado fila, List<AdvertenciaDto> advertencias)
     {
-        return new NominaDetalleDto
+        return new NominaEmpleadoDto
         {
-            IdNominaDetalle = fila.IdNominaDetalle,
+            IdNominaEmpleado = fila.IdNominaEmpleado,
             IdEmpleado = fila.IdEmpleado,
             CodigoEmpleado = fila.IdEmpleadoNavigation.CodigoEmpleado,
             NombreCompleto = $"{fila.IdEmpleadoNavigation.Nombres} {fila.IdEmpleadoNavigation.Apellidos}",
             IdPuesto = fila.IdPuesto,
-            NombrePuesto = fila.IdPuestoNavigation.Nombre,
+            NombrePuesto = fila.IdPuestoNavigation?.Nombre,
             IdDepartamento = fila.IdDepartamento,
-            NombreDepartamento = fila.IdDepartamentoNavigation.Nombre,
+            NombreDepartamento = fila.IdDepartamentoNavigation?.Nombre,
             Salario = fila.Salario,
-            TipoPago = fila.TipoPago,
             RetencionIsr = fila.RetencionIsr,
-            Isr = fila.Isr,
+            TipoPago = fila.TipoPago,
+            Banco = fila.Banco,
+            CuentaBancaria = fila.CuentaBancaria,
             DiasPeriodo = fila.DiasPeriodo,
             DiasFalta = fila.DiasFalta,
             DiasSuspension = fila.DiasSuspension,
+            DiasPagarSugeridos = fila.DiasPagarSugeridos,
             DiasPagar = fila.DiasPagar,
+            HorasExtraSugeridas = fila.HorasExtraSugeridas,
             HorasExtra = fila.HorasExtra,
-            SalarioDevengado = fila.SalarioDevengado,
-            MontoHorasExtra = fila.MontoHorasExtra,
-            Bonificacion = fila.Bonificacion,
-            OtrosIngresosAfectos = fila.OtrosIngresosAfectos,
-            OtrosIngresosNoAfectos = fila.OtrosIngresosNoAfectos,
+            Isr = fila.Isr,
+            DatosAjustados = fila.DatosAjustados,
             TotalIngresos = fila.TotalIngresos,
-            IgssLaboral = fila.IgssLaboral,
-            OtrosDescuentos = fila.OtrosDescuentos,
             TotalDescuentos = fila.TotalDescuentos,
-            LiquidoRecibir = fila.LiquidoRecibir,
-            IgssPatronal = fila.IgssPatronal,
-            Irtra = fila.Irtra,
-            Intecap = fila.Intecap,
+            Liquido = fila.Liquido,
+            TotalPatronal = fila.TotalPatronal,
+            Valores = fila.NominaValor
+                .OrderBy(v => v.IdRubroNavigation.Orden)
+                .Select(v => new NominaValorDto
+                {
+                    IdRubro = v.IdRubro,
+                    CodigoRubro = v.IdRubroNavigation.Codigo,
+                    NombreRubro = v.IdRubroNavigation.Nombre,
+                    Tipo = v.IdRubroNavigation.Tipo,
+                    Monto = v.Monto,
+                    Descripcion = v.Descripcion
+                }).ToList(),
+            Rubros = fila.NominaRubro.OrderBy(r => r.Orden).Select(ARubroDto).ToList(),
             Advertencias = advertencias
         };
     }
 
-    private sealed class DatosMes
+    private static NominaRubroDto ARubroDto(NominaRubro rubro)
     {
-        public Dictionary<int, List<(DateOnly Desde, DateOnly Hasta)>> Tramos { get; init; }
-        public Dictionary<int, Empleado> Empleados { get; init; }
-        public Dictionary<int, ResumenAsistenciaDto> Asistencias { get; init; }
-        public List<MovimientoNomina> Movimientos { get; init; }
+        return new NominaRubroDto
+        {
+            IdRubro = rubro.IdRubro,
+            Codigo = rubro.IdRubroNavigation.Codigo,
+            Nombre = rubro.IdRubroNavigation.Nombre,
+            Tipo = rubro.IdRubroNavigation.Tipo,
+            Orden = rubro.Orden,
+            Base = rubro.Base,
+            Monto = rubro.Monto,
+            Descripcion = rubro.Descripcion
+        };
     }
 }

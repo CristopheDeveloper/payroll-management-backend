@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -6,11 +6,22 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Planilla.Dominio.Entidades;
 
-[Index("Anio", "Mes", Name = "UQ_Nomina_Anio_Mes", IsUnique = true)]
+[Index("IdTipoPlanilla", "Anio", "Mes", Name = "IX_Nomina_Tipo_Anio_Mes")]
+[Index("Codigo", Name = "UQ_Nomina_Codigo", IsUnique = true)]
 public partial class Nomina
 {
     [Key]
     public int IdNomina { get; set; }
+
+    public int IdTipoPlanilla { get; set; }
+
+    [Required]
+    [StringLength(20)]
+    public string Codigo { get; set; }
+
+    [Required]
+    [StringLength(200)]
+    public string Descripcion { get; set; }
 
     public int Anio { get; set; }
 
@@ -19,6 +30,11 @@ public partial class Nomina
     public DateOnly FechaInicio { get; set; }
 
     public DateOnly FechaFin { get; set; }
+
+    public DateOnly FechaPago { get; set; }
+
+    [StringLength(500)]
+    public string Comentario { get; set; }
 
     [Required]
     [StringLength(15)]
@@ -36,19 +52,15 @@ public partial class Nomina
     [Column(TypeName = "decimal(12, 2)")]
     public decimal TotalPatronal { get; set; }
 
-    public DateTime? FechaCalculo { get; set; }
+    public DateTime? FechaPreparacion { get; set; }
+
+    public DateTime? FechaGeneracion { get; set; }
 
     [Column(TypeName = "decimal(9, 4)")]
     public decimal? IgssLaboral { get; set; }
 
     [Column(TypeName = "decimal(9, 4)")]
     public decimal? IgssPatronal { get; set; }
-
-    [Column(TypeName = "decimal(9, 4)")]
-    public decimal? Irtra { get; set; }
-
-    [Column(TypeName = "decimal(9, 4)")]
-    public decimal? Intecap { get; set; }
 
     [Column(TypeName = "decimal(10, 2)")]
     public decimal? BonificacionIncentivo { get; set; }
@@ -82,9 +94,10 @@ public partial class Nomina
 
     public DateTime? FechaAct { get; set; }
 
-    [InverseProperty("IdNominaNavigation")]
-    public virtual ICollection<MovimientoNomina> MovimientoNomina { get; set; } = new List<MovimientoNomina>();
+    [ForeignKey("IdTipoPlanilla")]
+    [InverseProperty("Nomina")]
+    public virtual TipoPlanilla IdTipoPlanillaNavigation { get; set; }
 
     [InverseProperty("IdNominaNavigation")]
-    public virtual ICollection<NominaDetalle> NominaDetalle { get; set; } = new List<NominaDetalle>();
+    public virtual ICollection<NominaEmpleado> NominaEmpleado { get; set; } = new List<NominaEmpleado>();
 }
