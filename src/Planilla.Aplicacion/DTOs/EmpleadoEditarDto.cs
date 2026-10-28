@@ -63,4 +63,8 @@ public class EmpleadoEditarDto
 
     [Range(typeof(decimal), "0", "999999.99", ParseLimitsInInvariantCulture = true, ErrorMessage = "La retención de ISR debe estar entre 0 y 999,999.99.")]
     public decimal RetencionIsr { get; set; }
+
+    [Required(ErrorMessage = "La bonificación incentivo es obligatoria.")]
+    [Range(typeof(decimal), "0", "999999.99", ParseLimitsInInvariantCulture = true, ErrorMessage = "La bonificación incentivo debe estar entre 0 y 999,999.99.")]
+    public decimal? BonificacionIncentivo { get; set; }
 }

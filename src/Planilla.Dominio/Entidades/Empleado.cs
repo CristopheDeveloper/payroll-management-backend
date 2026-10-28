@@ -75,6 +75,9 @@ public partial class Empleado
     [Column(TypeName = "decimal(10, 2)")]
     public decimal RetencionIsr { get; set; }
 
+    [Column(TypeName = "decimal(10, 2)")]
+    public decimal BonificacionIncentivo { get; set; }
+
     public bool Activo { get; set; }
 
     [Required]

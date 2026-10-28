@@ -14,6 +14,11 @@ public class ParametroServicio : IParametroServicio
         ClavesParametro.IgssLaboral, ClavesParametro.IgssPatronal
     ];
 
+    private static readonly string[] Cuentas =
+    [
+        ClavesParametro.CuentaSueldosPorPagar, ClavesParametro.CuentaIgssPatronalPorPagar
+    ];
+
     private readonly IParametroRepositorio _parametroRepositorio;
     private readonly IUnidadTrabajo _unidadTrabajo;
 
@@ -39,12 +44,22 @@ public class ParametroServicio : IParametroServicio
 
     public async Task<decimal> ObtenerSalarioMinimo()
     {
-        var parametro = await _parametroRepositorio.ObtenerPorClave(ClavesParametro.SalarioMinimo);
-        if (parametro == null || !decimal.TryParse(parametro.Valor, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var salario))
+        return await ObtenerNumero(ClavesParametro.SalarioMinimo);
+    }
+
+    public async Task<decimal> ObtenerBonificacionIncentivo()
+    {
+        return await ObtenerNumero(ClavesParametro.BonificacionIncentivo);
+    }
+
+    private async Task<decimal> ObtenerNumero(string clave)
+    {
+        var parametro = await _parametroRepositorio.ObtenerPorClave(clave);
+        if (parametro == null || !decimal.TryParse(parametro.Valor, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var numero))
         {
-            throw new InvalidOperationException($"El parámetro {ClavesParametro.SalarioMinimo} no existe o no es un número.");
+            throw new InvalidOperationException($"El parámetro {clave} no existe o no es un número.");
         }
-        return salario;
+        return numero;
     }
 
     public async Task<ParametroDto> Editar(int idParametro, ParametroEditarDto dto)
@@ -87,8 +102,17 @@ public class ParametroServicio : IParametroServicio
                 {
                     throw new ReglaNegocioException("El valor no puede estar vacío.");
                 }
+                if (Cuentas.Contains(parametro.Clave) && !EsCuenta(valor))
+                {
+                    throw new ReglaNegocioException("La cuenta contable debe tener 4 dígitos.");
+                }
                 break;
         }
+    }
+
+    private static bool EsCuenta(string valor)
+    {
+        return valor.Length == 4 && valor.All(char.IsAsciiDigit);
     }
 
     private static void ValidarRango(string clave, decimal numero)

@@ -74,6 +74,15 @@ public class AsistenciaRepositorio : IAsistenciaRepositorio
             .ToListAsync();
     }
 
+    public async Task<List<Asistencia>> ObtenerAusenciasEntre(DateOnly desde, DateOnly hasta)
+    {
+        return await _context.Asistencia
+            .AsNoTracking()
+            .Where(a => a.Fecha >= desde && a.Fecha <= hasta && a.Estado != "PRESENTE")
+            .OrderBy(a => a.Fecha)
+            .ToListAsync();
+    }
+
     public async Task<List<DateOnly>> ObtenerFechas(int idEmpleado, DateOnly desde, DateOnly? hasta)
     {
         return await _context.Asistencia

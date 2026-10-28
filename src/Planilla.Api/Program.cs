@@ -47,6 +47,7 @@ builder.Services.AddScoped<IAsistenciaServicio, AsistenciaServicio>();
 builder.Services.AddScoped<IRubroServicio, RubroServicio>();
 builder.Services.AddScoped<INominaServicio, NominaServicio>();
 builder.Services.AddScoped<IReporteServicio, ReporteServicio>();
+builder.Services.AddScoped<IReporteCatalogoServicio, ReporteCatalogoServicio>();
 builder.Services.Configure<SftpFotoEmpleadoOpciones>(
     builder.Configuration.GetSection(SftpFotoEmpleadoOpciones.Seccion));
 builder.Services.AddSingleton<IAlmacenFotoEmpleado, SftpAlmacenFotoEmpleado>();

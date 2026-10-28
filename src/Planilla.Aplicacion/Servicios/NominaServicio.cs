@@ -78,12 +78,6 @@ public class NominaServicio : INominaServicio
         {
             throw new ReglaNegocioException("Solo se pueden crear planillas hasta el mes siguiente.");
         }
-        var masAntigua = await _nominaRepositorio.ObtenerInicioMasAntiguo(tipo.IdTipoPlanilla);
-        if (masAntigua.HasValue && inicio < masAntigua.Value)
-        {
-            throw new ReglaNegocioException($"No se pueden crear planillas anteriores a la más antigua ({masAntigua.Value:MM'/'yyyy}).", 409);
-        }
-
         var codigo = string.IsNullOrWhiteSpace(dto.Codigo) ? await CodigoLibre($"MEN-{dto.Anio}-{dto.Mes:00}") : dto.Codigo.Trim().ToUpper();
         if (await _nominaRepositorio.ExisteCodigo(codigo, null))
         {
@@ -218,6 +212,7 @@ public class NominaServicio : INominaServicio
             fila.IdDepartamento = empleado.IdDepartamento;
             fila.Salario = empleado.Salario;
             fila.RetencionIsr = empleado.RetencionIsr;
+            fila.BonificacionIncentivo = empleado.BonificacionIncentivo;
             fila.TipoPago = empleado.TipoPago;
             fila.Banco = empleado.Banco;
             fila.CuentaBancaria = empleado.CuentaBancaria;
@@ -423,6 +418,7 @@ public class NominaServicio : INominaServicio
             {
                 Salario = fila.Salario,
                 Isr = fila.Isr,
+                BonificacionIncentivo = fila.BonificacionIncentivo,
                 DiasPagar = fila.DiasPagar,
                 HorasExtra = fila.HorasExtra,
                 Valores = fila.NominaValor.Select(v => new ValorManual
@@ -769,7 +765,7 @@ public class NominaServicio : INominaServicio
         var anterior = nomina.FechaInicio.AddMonths(-1);
         if (masAntigua < nomina.FechaInicio && !await _nominaRepositorio.ExisteTipoMes(nomina.IdTipoPlanilla, anterior.Year, anterior.Month))
         {
-            advertencias.Add(Advertencia("MES_ANTERIOR_FALTANTE", $"Falta crear la planilla de {anterior:MM'/'yyyy}.", true, null));
+            advertencias.Add(Advertencia("MES_ANTERIOR_FALTANTE", $"No hay planilla de {anterior:MM'/'yyyy}.", false, null));
         }
 
         if (nomina.Estado != "CREADA")
@@ -835,7 +831,6 @@ public class NominaServicio : INominaServicio
         {
             IgssLaboral = LeerDecimal(valores, ClavesParametro.IgssLaboral, 0, 100, 4),
             IgssPatronal = LeerDecimal(valores, ClavesParametro.IgssPatronal, 0, 100, 4),
-            BonificacionIncentivo = LeerDecimal(valores, ClavesParametro.BonificacionIncentivo, 0, 99999999.99m, 2),
             FactorHoraExtra = LeerDecimal(valores, ClavesParametro.FactorHoraExtra, 1, 10, 4),
             DiasMes = (int)LeerDecimal(valores, ClavesParametro.DiasMes, 1, 31, 0),
             HorasMes = (int)LeerDecimal(valores, ClavesParametro.HorasMes, 1, 999, 0)
@@ -861,7 +856,6 @@ public class NominaServicio : INominaServicio
         {
             IgssLaboral = nomina.IgssLaboral.Value,
             IgssPatronal = nomina.IgssPatronal.Value,
-            BonificacionIncentivo = nomina.BonificacionIncentivo.Value,
             FactorHoraExtra = nomina.FactorHoraExtra.Value,
             DiasMes = nomina.DiasMes.Value,
             HorasMes = nomina.HorasMes.Value
@@ -872,7 +866,6 @@ public class NominaServicio : INominaServicio
     {
         nomina.IgssLaboral = parametros.IgssLaboral;
         nomina.IgssPatronal = parametros.IgssPatronal;
-        nomina.BonificacionIncentivo = parametros.BonificacionIncentivo;
         nomina.FactorHoraExtra = parametros.FactorHoraExtra;
         nomina.DiasMes = parametros.DiasMes;
         nomina.HorasMes = parametros.HorasMes;
@@ -924,7 +917,6 @@ public class NominaServicio : INominaServicio
             FechaGeneracion = nomina.FechaGeneracion,
             IgssLaboral = nomina.IgssLaboral,
             IgssPatronal = nomina.IgssPatronal,
-            BonificacionIncentivo = nomina.BonificacionIncentivo,
             FactorHoraExtra = nomina.FactorHoraExtra,
             DiasMes = nomina.DiasMes,
             HorasMes = nomina.HorasMes,
@@ -951,6 +943,7 @@ public class NominaServicio : INominaServicio
             NombreDepartamento = fila.IdDepartamentoNavigation?.Nombre,
             Salario = fila.Salario,
             RetencionIsr = fila.RetencionIsr,
+            BonificacionIncentivo = fila.BonificacionIncentivo,
             TipoPago = fila.TipoPago,
             Banco = fila.Banco,
             CuentaBancaria = fila.CuentaBancaria,

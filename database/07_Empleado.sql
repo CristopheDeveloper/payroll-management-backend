@@ -23,6 +23,7 @@ CREATE TABLE Empleado (
     IdDepartamento  INT               NOT NULL,
     Salario         DECIMAL(10,2)     NOT NULL,
     RetencionIsr    DECIMAL(10,2)     NOT NULL CONSTRAINT DF_Empleado_RetencionIsr DEFAULT (0),
+    BonificacionIncentivo DECIMAL(10,2) NOT NULL,
     Activo          BIT               NOT NULL CONSTRAINT DF_Empleado_Activo DEFAULT (1),
     UsuarioIng      NVARCHAR(50)      NOT NULL,
     FechaIng        DATETIME2         NOT NULL CONSTRAINT DF_Empleado_FechaIng DEFAULT (SYSDATETIME()),
@@ -37,6 +38,7 @@ CREATE TABLE Empleado (
     CONSTRAINT CK_Empleado_Genero CHECK (Genero IN ('M', 'F')),
     CONSTRAINT CK_Empleado_TipoPago CHECK (TipoPago IN ('EFECTIVO', 'CHEQUE', 'TRANSFERENCIA')),
     CONSTRAINT CK_Empleado_Salario CHECK (Salario > 0),
-    CONSTRAINT CK_Empleado_RetencionIsr CHECK (RetencionIsr >= 0)
+    CONSTRAINT CK_Empleado_RetencionIsr CHECK (RetencionIsr >= 0),
+    CONSTRAINT CK_Empleado_BonificacionIncentivo CHECK (BonificacionIncentivo >= 0)
 );
 GO

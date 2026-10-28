@@ -12,7 +12,6 @@ public class CalculoNominaTests
         {
             IgssLaboral = 4.83m,
             IgssPatronal = 10.67m,
-            BonificacionIncentivo = 250m,
             FactorHoraExtra = 1.5m,
             DiasMes = diasMes,
             HorasMes = 240
@@ -24,12 +23,14 @@ public class CalculoNominaTests
         return new PeriodoLaboral { FechaIngreso = ingreso, FechaBaja = baja };
     }
 
-    private static DatosEmpleadoMes Datos(decimal salario, int diasPagar, decimal horasExtra = 0, decimal isr = 0)
+    private static DatosEmpleadoMes Datos(decimal salario, int diasPagar, decimal horasExtra = 0, decimal isr = 0,
+        decimal bonificacion = 250m)
     {
         return new DatosEmpleadoMes
         {
             Salario = salario,
             Isr = isr,
+            BonificacionIncentivo = bonificacion,
             DiasPagar = diasPagar,
             HorasExtra = horasExtra
         };
@@ -150,6 +151,21 @@ public class CalculoNominaTests
         Assert.Equal(25, diasPagar);
         Assert.Equal(Math.Round(250m * 25 / 30, 2, MidpointRounding.AwayFromZero),
             Monto(Calcular(Datos(3000m, diasPagar)), CodigosRubro.BonificacionIncentivo));
+    }
+
+    [Fact]
+    public void BonificacionPropiaDelEmpleado()
+    {
+        Assert.Equal(400m, Monto(Calcular(Datos(6000m, 24, bonificacion: 500m)), CodigosRubro.BonificacionIncentivo));
+    }
+
+    [Fact]
+    public void BonificacionEnCeroNoGeneraRubro()
+    {
+        var rubros = Calcular(Datos(4000m, 30, bonificacion: 0m));
+
+        Assert.DoesNotContain(rubros, r => r.Codigo == CodigosRubro.BonificacionIncentivo);
+        Assert.Equal(4000m, CalculoNomina.Total(rubros, "INGRESO"));
     }
 
     [Fact]

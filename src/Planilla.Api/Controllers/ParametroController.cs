@@ -38,6 +38,12 @@ public class ParametroController : ControllerBase
         return await _parametroServicio.ObtenerSalarioMinimo();
     }
 
+    [HttpGet("bonificacion-incentivo")]
+    public async Task<ActionResult<decimal>> ObtenerBonificacionIncentivo()
+    {
+        return await _parametroServicio.ObtenerBonificacionIncentivo();
+    }
+
     [HttpPut("{id:int}")]
     [Authorize(Roles = Roles.Admin)]
     public async Task<ActionResult<ParametroDto>> Editar(int id, ParametroEditarDto dto)

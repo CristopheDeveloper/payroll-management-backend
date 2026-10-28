@@ -183,6 +183,10 @@ public class AsistenciaServicio : IAsistenciaServicio
         {
             throw new ReglaNegocioException("No se pueden registrar ausencias con más de un año de anticipación.");
         }
+        if (dto.Estado == "FALTA" && hasta > Hoy())
+        {
+            throw new ReglaNegocioException("Las faltas no se pueden registrar en fechas futuras.");
+        }
 
         var empleado = await _empleadoRepositorio.ObtenerPorId(dto.IdEmpleado)
             ?? throw new ReglaNegocioException("El empleado no existe.", 404);
