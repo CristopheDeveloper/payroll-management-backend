@@ -104,4 +104,7 @@ public partial class Empleado
 
     [InverseProperty("IdEmpleadoNavigation")]
     public virtual ICollection<PeriodoLaboral> PeriodoLaboral { get; set; } = new List<PeriodoLaboral>();
+
+    [InverseProperty(nameof(EmpleadoFoto.Empleado))]
+    public virtual EmpleadoFoto Foto { get; set; }
 }

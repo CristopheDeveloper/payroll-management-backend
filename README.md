@@ -74,7 +74,8 @@ Desde Visual Studio: clic derecho en `Planilla.Api` → Administrar secretos de 
 ```json
 {
   "ConnectionStrings:DefaultConnection": "Server=db.notcodefirst.com,1433;Database=Payroll_Dev;User Id=tu_usuario;Password=tu_contraseña;TrustServerCertificate=True",
-  "Jwt:Clave": "la clave del grupo"
+  "Jwt:Clave": "la clave del grupo",
+  "EmployeePhotos:Password": "contraseña del usuario SFTP fileserver"
 }
 ```
 
@@ -89,10 +90,19 @@ Si usas tu SQL Server local con autenticación de Windows:
 
 `Jwt:Clave` es la clave con la que se firman los tokens del login. Tiene que tener al menos 32 caracteres y, si no está, la API no arranca. Pídela al grupo para que todos usemos la misma.
 
+Las fotos de empleados se suben por SFTP a `files.notcodefirst.com`, dentro de la carpeta
+`imagenes`. El usuario, host, carpeta y URL pública están en `EmployeePhotos` dentro de
+`appsettings.json`; la contraseña se configura únicamente como User Secret o variable de entorno
+`EmployeePhotos__Password`. La URL guardada apunta al endpoint autenticado de la API, que descarga
+el archivo desde SFTP; así las fotos no necesitan quedar publicadas directamente por el servidor.
+Opcionalmente configura `EmployeePhotos:HostKeyFingerprint` con la huella hexadecimal de la clave
+SSH para fijar la identidad del servidor.
+
 También se puede por consola desde la raíz del proyecto:
 
 ```
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" "tu cadena de conexión" --project src/Planilla.Api
+dotnet user-secrets set "EmployeePhotos:Password" "tu contraseña SFTP" --project src/Planilla.Api
 ```
 
 Los User Secrets solo se leen en Development.

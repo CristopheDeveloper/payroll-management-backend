@@ -8,9 +8,12 @@ public interface IEmpleadoRepositorio
     Task<Empleado> ObtenerPorId(int idEmpleado);
     Task<Empleado> ObtenerParaModificar(int idEmpleado);
     Task<Empleado> ObtenerPorDpi(string dpi, int idExcluir);
+    Task<EmpleadoFoto> ObtenerFotoParaModificar(int idEmpleado);
     Task<List<PeriodoLaboral>> ObtenerPeriodosParaModificar(int idEmpleado);
     Task<bool> ExistenActivosEnDepartamento(int idDepartamento);
     Task<bool> ExistenActivosEnPuesto(int idPuesto);
     void Agregar(Empleado empleado);
     void AgregarPeriodo(PeriodoLaboral periodo);
+    void AgregarFoto(EmpleadoFoto foto);
+    void EliminarFoto(EmpleadoFoto foto);
 }
