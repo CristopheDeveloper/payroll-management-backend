@@ -26,5 +26,7 @@ INSERT INTO Parametro (Clave, Valor, TipoDato, Descripcion, UsuarioIng) VALUES
     ('NIT_EMPRESA',            '8475123-6',                    'TEXTO',   N'NIT de la empresa', 'SISTEMA'),
     ('DIRECCION_EMPRESA',      N'Cuilapa, Santa Rosa',          'TEXTO',   N'Dirección de la empresa', 'SISTEMA'),
     ('CUENTA_SUELDOS_POR_PAGAR',       '2101', 'TEXTO', N'Cuenta contable del líquido a pagar en la póliza de planilla', 'SISTEMA'),
-    ('CUENTA_IGSS_PATRONAL_POR_PAGAR', '2103', 'TEXTO', N'Cuenta contable de la cuota patronal del IGSS por pagar', 'SISTEMA');
+    ('CUENTA_IGSS_PATRONAL_POR_PAGAR', '2103', 'TEXTO', N'Cuenta contable de la cuota patronal del IGSS por pagar', 'SISTEMA'),
+    ('CUENTA_BANCOS',                  '1102', 'TEXTO', N'Cuenta contable del banco de la empresa para pagos por transferencia y cheque', 'SISTEMA'),
+    ('CUENTA_CAJA',                    '1101', 'TEXTO', N'Cuenta contable de caja para pagos en efectivo', 'SISTEMA');
 GO

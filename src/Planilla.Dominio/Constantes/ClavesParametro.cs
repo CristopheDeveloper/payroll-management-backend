@@ -14,4 +14,6 @@ public static class ClavesParametro
     public const string DireccionEmpresa = "DIRECCION_EMPRESA";
     public const string CuentaSueldosPorPagar = "CUENTA_SUELDOS_POR_PAGAR";
     public const string CuentaIgssPatronalPorPagar = "CUENTA_IGSS_PATRONAL_POR_PAGAR";
+    public const string CuentaBancos = "CUENTA_BANCOS";
+    public const string CuentaCaja = "CUENTA_CAJA";
 }

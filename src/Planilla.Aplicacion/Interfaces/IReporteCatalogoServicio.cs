@@ -10,6 +10,7 @@ public interface IReporteCatalogoServicio
     Task<ReporteTablaDto> Rubros(int idNomina, int? idRubro);
     Task<ReporteTablaDto> Igss(int idNomina);
     Task<ReporteTablaDto> Poliza(int idNomina);
+    Task<ReporteTablaDto> PolizaPago(int idNomina);
     Task<ReporteTablaDto> Empleados(string estado, int? idDepartamento, int? idPuesto);
     Task<ReporteTablaDto> AltasBajas(DateOnly desde, DateOnly hasta);
     Task<ReporteTablaDto> Historial(int idEmpleado, DateOnly? desde, DateOnly? hasta);
