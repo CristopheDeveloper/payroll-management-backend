@@ -10,4 +10,5 @@ public class SftpFotoEmpleadoOpciones
     public string Password { get; set; }
     public string RemoteDirectory { get; set; } = "imagenes";
     public string HostKeyFingerprint { get; set; }
+    public string LocalDirectory { get; set; }
 }

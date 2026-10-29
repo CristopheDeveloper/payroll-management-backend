@@ -50,7 +50,10 @@ builder.Services.AddScoped<IReporteServicio, ReporteServicio>();
 builder.Services.AddScoped<IReporteCatalogoServicio, ReporteCatalogoServicio>();
 builder.Services.Configure<SftpFotoEmpleadoOpciones>(
     builder.Configuration.GetSection(SftpFotoEmpleadoOpciones.Seccion));
-builder.Services.AddSingleton<IAlmacenFotoEmpleado, SftpAlmacenFotoEmpleado>();
+if (builder.Environment.IsDevelopment())
+    builder.Services.AddSingleton<IAlmacenFotoEmpleado, LocalAlmacenFotoEmpleado>();
+else
+    builder.Services.AddSingleton<IAlmacenFotoEmpleado, SftpAlmacenFotoEmpleado>();
 
 QuestPDF.Settings.License = LicenseType.Community;
 QuestPDF.Settings.ThrowOnMissingTextGlyphs = false;

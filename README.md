@@ -90,13 +90,19 @@ Si usas tu SQL Server local con autenticación de Windows:
 
 `Jwt:Clave` es la clave con la que se firman los tokens del login. Tiene que tener al menos 32 caracteres y, si no está, la API no arranca. Pídela al grupo para que todos usemos la misma.
 
-Las fotos de empleados se suben por SFTP a `files.notcodefirst.com`, dentro de la carpeta
-`imagenes`. El usuario, host, carpeta y URL pública están en `EmployeePhotos` dentro de
-`appsettings.json`; la contraseña se configura únicamente como User Secret o variable de entorno
-`EmployeePhotos__Password`. La URL guardada apunta al endpoint autenticado de la API, que descarga
-el archivo desde SFTP; así las fotos no necesitan quedar publicadas directamente por el servidor.
-Opcionalmente configura `EmployeePhotos:HostKeyFingerprint` con la huella hexadecimal de la clave
-SSH para fijar la identidad del servidor.
+En `Development`, las fotos se guardan localmente en la carpeta
+`Documentos/Planilla/imagenes` del usuario que ejecuta la API. La carpeta se crea automáticamente
+la primera vez que se usa el almacenamiento. Si necesitas otra ubicación, configura
+`EmployeePhotos:LocalDirectory` con una ruta absoluta en User Secrets o mediante la variable de
+entorno `EmployeePhotos__LocalDirectory`.
+
+En `QA` y `Production`, las fotos se suben por SFTP a `files.notcodefirst.com`, dentro de la carpeta
+`imagenes`. El usuario, host y carpeta están en `EmployeePhotos` dentro de `appsettings.json`; la
+contraseña se configura únicamente como User Secret o variable de entorno
+`EmployeePhotos__Password`. La URL guardada siempre apunta al endpoint autenticado de la API, que
+lee el archivo desde el almacenamiento del ambiente. Opcionalmente configura
+`EmployeePhotos:HostKeyFingerprint` con la huella hexadecimal de la clave SSH para fijar la
+identidad del servidor.
 
 También se puede por consola desde la raíz del proyecto:
 
