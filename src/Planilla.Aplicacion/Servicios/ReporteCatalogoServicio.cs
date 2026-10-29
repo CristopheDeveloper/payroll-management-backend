@@ -291,6 +291,41 @@ public class ReporteCatalogoServicio : IReporteCatalogoServicio
             Preliminar(nomina));
     }
 
+    public async Task<ReporteTablaDto> PolizaPago(int idNomina)
+    {
+        var nomina = await ObtenerGenerada(idNomina);
+        var empleados = await _nominaRepositorio.ObtenerEmpleadosNomina(idNomina);
+        var liquido = empleados.Sum(f => f.Liquido);
+        var efectivo = empleados.Where(f => f.TipoPago == "EFECTIVO").Sum(f => f.Liquido);
+        var banco = liquido - efectivo;
+
+        var lineas = new List<(string Cuenta, string Nombre, decimal Debe, decimal Haber)>
+        {
+            (await CuentaParametro(ClavesParametro.CuentaSueldosPorPagar, "sueldos por pagar"), "Sueldos por pagar",
+                liquido, 0)
+        };
+        if (banco != 0)
+        {
+            lineas.Add((await CuentaParametro(ClavesParametro.CuentaBancos, "bancos"),
+                "Bancos (transferencias y cheques)", 0, banco));
+        }
+        if (efectivo != 0)
+        {
+            lineas.Add((await CuentaParametro(ClavesParametro.CuentaCaja, "caja"), "Caja (efectivo)", 0, efectivo));
+        }
+
+        var columnas = new List<ColumnaReporteDto>
+        {
+            Columna("Cuenta"), Columna("Descripción"), Columna("Debe", Moneda, true), Columna("Haber", Moneda, true)
+        };
+        var filas = lineas
+            .Select(l => Fila(null, l.Cuenta, l.Nombre, l.Debe == 0 ? null : l.Debe, l.Haber == 0 ? null : l.Haber))
+            .ToList();
+
+        return await Crear("Póliza de pago de sueldos", Subtitulo(nomina), [], columnas, filas,
+            $"poliza-pago-{nomina.Codigo}", Preliminar(nomina));
+    }
+
     public async Task<ReporteTablaDto> Empleados(string estado, int? idDepartamento, int? idPuesto)
     {
         var valor = string.IsNullOrWhiteSpace(estado) ? "ACTIVOS" : estado.Trim().ToUpper();

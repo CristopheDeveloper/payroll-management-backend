@@ -58,6 +58,12 @@ public class ReporteCatalogoController : ControllerBase
         return Responder(await _reporteCatalogoServicio.Poliza(idNomina), formato);
     }
 
+    [HttpGet("planilla/{idNomina:int}/poliza-pago")]
+    public async Task<IActionResult> PolizaPago(int idNomina, string formato)
+    {
+        return Responder(await _reporteCatalogoServicio.PolizaPago(idNomina), formato);
+    }
+
     [HttpGet("empleados")]
     public async Task<IActionResult> Empleados(string estado, int? idDepartamento, int? idPuesto, string formato)
     {

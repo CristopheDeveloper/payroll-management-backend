@@ -16,7 +16,8 @@ public class ParametroServicio : IParametroServicio
 
     private static readonly string[] Cuentas =
     [
-        ClavesParametro.CuentaSueldosPorPagar, ClavesParametro.CuentaIgssPatronalPorPagar
+        ClavesParametro.CuentaSueldosPorPagar, ClavesParametro.CuentaIgssPatronalPorPagar,
+        ClavesParametro.CuentaBancos, ClavesParametro.CuentaCaja
     ];
 
     private readonly IParametroRepositorio _parametroRepositorio;
